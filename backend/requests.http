@@ -1,0 +1,113 @@
+### =====================================================================
+### CAMPAIGNS  — proves CampaignController -> CampaignOrchestrator
+###              -> CampaignService -> CampaignRepository
+### =====================================================================
+
+### 1. List campaigns (should be [] on a fresh start)
+GET http://localhost:8080/api/v1/campaigns
+Accept: application/json
+
+### 2. Create a campaign  (expect 201 Created + a JSON body with "id": 1)
+POST http://localhost:8080/api/v1/campaigns
+Content-Type: application/json
+
+{
+  "name": "Curse of Strahd",
+  "description": "A gothic horror campaign set in Barovia.",
+  "system": "D&D 5e",
+  "worldLore": "The land of Barovia is trapped in mists, ruled by the vampire Strahd von Zarovich."
+}
+
+### 3. List campaigns again (should now contain the campaign above)
+GET http://localhost:8080/api/v1/campaigns
+Accept: application/json
+
+### 4. Get a single campaign by id
+GET http://localhost:8080/api/v1/campaigns/1
+Accept: application/json
+
+### 5. Update the campaign (expect the new name in the response)
+PUT http://localhost:8080/api/v1/campaigns/1
+Content-Type: application/json
+
+{
+  "name": "Curse of Strahd (Revised)",
+  "description": "A gothic horror campaign set in Barovia.",
+  "system": "D&D 5e",
+  "worldLore": "The mists have thickened. Strahd watches from Castle Ravenloft."
+}
+
+### 6. ERROR CASE: get a campaign that does not exist
+###    Expect 404 + {"error": "Campaign 999 not found"}
+###    This proves the GlobalExceptionHandler works.
+GET http://localhost:8080/api/v1/campaigns/999
+Accept: application/json
+
+
+### =====================================================================
+### SESSIONS — proves the nested Campaign -> Session relationship
+### =====================================================================
+
+### 7. Add a session to campaign 1 (expect 201)
+POST http://localhost:8080/api/v1/campaigns/1/sessions
+Content-Type: application/json
+
+{
+  "title": "Into the Mists",
+  "sessionNumber": 1,
+  "date": "2026-08-06",
+  "notes": "The party entered Barovia and met the Burgomaster.",
+  "summary": "Session 1: arrival in Barovia."
+}
+
+### 8. Add a second session
+POST http://localhost:8080/api/v1/campaigns/1/sessions
+Content-Type: application/json
+
+{
+  "title": "The Village of Barovia",
+  "sessionNumber": 2,
+  "date": "2026-08-13",
+  "notes": "The party explored the village and found Ireena.",
+  "summary": "Session 2: meeting Ireena Kolyana."
+}
+
+### 9. List sessions for campaign 1 (should return both, ordered by sessionNumber)
+GET http://localhost:8080/api/v1/campaigns/1/sessions
+Accept: application/json
+
+### 10. Get one session directly
+GET http://localhost:8080/api/v1/sessions/1
+Accept: application/json
+
+
+### =====================================================================
+### CHARACTERS — best proof the SERVICE layer works, because the
+###               response contains CALCULATED values that were never sent.
+### =====================================================================
+
+### 11. Create a character.
+###     Note: we send raw ability scores only.
+###     Expect the response to also contain "abilityModifiers" and
+###     "proficiencyBonus", which the CharacterCalculationService computed:
+###       strength 16  -> modifier +3
+###       dexterity 14 -> modifier +2
+###       level 5      -> proficiencyBonus 3
+POST http://localhost:8080/api/v1/characters
+Content-Type: application/json
+
+{
+  "name": "Aria the Bold",
+  "characterClass": "Fighter",
+  "level": 5,
+  "strength": 16,
+  "dexterity": 14,
+  "constitution": 15,
+  "intelligence": 10,
+  "wisdom": 12,
+  "charisma": 8
+}
+
+### 12. List characters (calculated values should appear again)
+GET http://localhost:8080/api/v1/characters
+Accept: application/json

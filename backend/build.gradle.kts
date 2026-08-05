@@ -11,7 +11,7 @@ version = "0.0.1-SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(22))
     }
 }
 
@@ -29,6 +29,9 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
+    // API documentation (Swagger UI + OpenAPI 3)
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
+
     // Databases
     runtimeOnly("com.h2database:h2")           // dev / tests
     runtimeOnly("org.postgresql:postgresql")    // prod
@@ -41,8 +44,17 @@ dependencies {
 
 kotlin {
     compilerOptions {
+        // Fully-qualified name avoids a top-level import (which kept getting stripped).
+        // JVM_21 is supported by both Kotlin 1.9.x and 2.0.x.
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         freeCompilerArgs.addAll("-Xjsr305=strict")
     }
+}
+
+// Compile Java to bytecode 21 as well, so compileJava and compileKotlin match,
+// even though the app runs on the JDK 22 toolchain.
+tasks.withType<JavaCompile> {
+    options.release.set(21)
 }
 
 tasks.withType<Test> {

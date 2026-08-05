@@ -3,6 +3,8 @@ package com.dndsaas.controller
 import com.dndsaas.dto.CharacterResponse
 import com.dndsaas.dto.CreateCharacterRequest
 import com.dndsaas.orchestration.CharacterOrchestrator
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -18,18 +20,22 @@ import org.springframework.web.bind.annotation.RestController
  */
 @RestController
 @RequestMapping("/v1/characters")
+@Tag(name = "Characters", description = "Player characters and their calculated stats")
 class CharacterController(
     private val orchestrator: CharacterOrchestrator,
 ) {
 
     @PostMapping
+    @Operation(summary = "Create a character (returns calculated modifiers and proficiency bonus)")
     fun create(@RequestBody request: CreateCharacterRequest): ResponseEntity<CharacterResponse> =
         ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.createCharacter(request))
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get a character by id")
     fun get(@PathVariable id: Long): CharacterResponse = orchestrator.getCharacter(id)
 
     @GetMapping
+    @Operation(summary = "List all characters")
     fun list(): List<CharacterResponse> = orchestrator.listCharacters()
 }
 

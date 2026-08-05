@@ -9,6 +9,16 @@ server:
   servlet:
     context-path: /api
 
+# API documentation (springdoc-openapi / Swagger UI)
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: alpha
+    tagsSorter: alpha
+    display-request-duration: true
+  api-docs:
+    path: /v3/api-docs
+
 ---
 # Development profile: in-memory H2 database
 spring:
