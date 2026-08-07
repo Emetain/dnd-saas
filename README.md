@@ -127,7 +127,97 @@ Campaign
 ```
 
 `GET /api/v1/campaigns/{id}/memory` returns the whole graph in one structured
-payload — this is exactly what the AI service will collect as context in Phase 3.
+payload — this is exactly what the AI service collects as context.
+
+## The central AI service
+
+Every AI request in the platform goes through one service (`AiService`) and
+always performs the same five steps:
+
+```
+GenerationRequest
+      │
+      ▼
+1. AiContextCollector    reads Campaign Memory, condenses it per generation type
+      ▼
+2. PromptBuilder         system rules + campaign context + the DM's instruction
+      ▼
+3. LlmClient             OpenAiClient  (real)   or   MockLlmClient  (free)
+      ▼
+4. AiResponseValidator   repairs + parses JSON, checks required fields
+      ▼
+5. GenerationLogService  stores the result, model, tokens and duration
+      ▼
+GenerationResponse
+```
+
+Generators (Phase 4) never call OpenAI themselves — they describe what they want
+and call `AiService.generate(...)`, so context injection, validation, logging and
+billing stay in one place.
+
+### Configuring the key
+
+The key is read from the `OPENAI_API_KEY` environment variable and never stored
+in a file. Set it in the IntelliJ run configuration under **Environment
+variables**, or export it in your shell. At startup the application logs whether
+it was detected (masked), and `GET /api/v1/ai/status` reports the same.
+
+**Without a key the application still starts** and automatically uses
+`MockLlmClient`, so the whole pipeline can be developed and tested for free.
+
+### Testing without spending tokens
+
+| Endpoint | Cost |
+|---|---|
+| `GET /v1/campaigns/{id}/ai/preview` | **free** — shows the exact prompt, never calls the model |
+| `POST /v1/campaigns/{id}/ai/generate` with `"mock": true` | **free** — runs all five steps against the mock |
+| `POST /v1/campaigns/{id}/ai/generate` | spends OpenAI tokens |
+
+## The Campaign Generator
+
+A campaign is not created by filling in a form — the AI interviews you first,
+then builds the world from your answers.
+
+```
+1. POST /v1/ai/campaign-generator/interview
+      you: "a campaign where the party slowly realises they work for the villain"
+      AI:  5-6 tailored questions, each with suggested answers
+            - What is the central conflict?
+            - What does the villain actually want?
+            - Why is this party the one that has to deal with it?
+
+2. you answer them (or skip any)
+
+3. POST /v1/ai/campaign-generator/generate
+      → campaign name, premise and world lore
+      → locations (nested), factions, NPCs, quests — all interlinked
+      → a ready-to-run Session 1: opening scene, beats, encounters, cliffhanger
+```
+
+**Everything is saved as structured Campaign Memory**, not as a wall of text.
+The generated NPCs really belong to the generated factions and live in the
+generated locations, and the quests really point at those NPCs. That means every
+later generation is already grounded in this world.
+
+Session 1 is stored as a real `Session`, with the full plan in its notes.
+
+The interview is optional — `generate` works with an empty `answers` array — and
+both endpoints accept `"mock": true` to run the whole flow for free.
+
+> ### ⚠️ One-off schema change (PostgreSQL only)
+>
+> `generation_logs.campaign_id` became **nullable** when the campaign interview
+> was added — the interview runs *before* a campaign exists. Hibernate's
+> `ddl-auto: update` adds columns but never relaxes an existing `NOT NULL`
+> constraint, so an existing database needs one statement:
+>
+> ```sql
+> ALTER TABLE generation_logs ALTER COLUMN campaign_id DROP NOT NULL;
+> ```
+>
+> Run it in Adminer (http://localhost:8081). Alternatively, since the table only
+> holds logs, `DROP TABLE generation_logs;` and let Hibernate recreate it.
+> The H2 `dev` profile is unaffected — it rebuilds the schema on every start.
 
 ## Example API
 
@@ -167,6 +257,14 @@ POST   /api/v1/campaigns/{id}/events              # world events
 
 GET    /api/v1/campaigns/{id}/memory/stats        # memory counts (dashboard)
 GET    /api/v1/campaigns/{id}/memory              # ⭐ full structured snapshot
+
+GET    /api/v1/ai/status                          # is the OpenAI key loaded?
+POST   /api/v1/ai/campaign-generator/interview    # ⭐ AI asks you about your idea
+POST   /api/v1/ai/campaign-generator/generate     # ⭐ build + save a whole campaign
+GET    /api/v1/campaigns/{id}/ai/preview          # see the prompt (free)
+POST   /api/v1/campaigns/{id}/ai/generate         # generate with campaign context
+GET    /api/v1/campaigns/{id}/ai/history          # everything generated so far
+GET    /api/v1/campaigns/{id}/ai/usage            # token usage totals
 ```
 
 See `backend/requests.http` for ready-to-run examples (executable from IntelliJ).

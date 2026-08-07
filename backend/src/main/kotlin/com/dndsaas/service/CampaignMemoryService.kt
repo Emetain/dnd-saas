@@ -31,6 +31,7 @@ class CampaignMemoryService(
     private val relationshipService: RelationshipService,
     private val characterService: CharacterService,
     private val sessionService: SessionService,
+    private val generationLogService: GenerationLogService,
     private val sessionRepository: SessionRepository,
     private val characterRepository: CharacterRepository,
 ) {
@@ -75,6 +76,7 @@ class CampaignMemoryService(
      */
     @Transactional
     fun deleteAllForCampaign(campaignId: Long) {
+        generationLogService.deleteAllForCampaign(campaignId)
         relationshipService.deleteAllForCampaign(campaignId)
         itemService.deleteAllForCampaign(campaignId)
         worldEventService.deleteAllForCampaign(campaignId)
