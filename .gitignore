@@ -1,0 +1,12 @@
+# Environment / secrets — never commit these
+.env
+.env.local
+*.env
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+

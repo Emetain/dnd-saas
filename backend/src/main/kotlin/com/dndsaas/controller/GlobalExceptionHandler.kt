@@ -14,5 +14,12 @@ class GlobalExceptionHandler {
     @ExceptionHandler(NoSuchElementException::class)
     fun handleNotFound(ex: NoSuchElementException): ResponseEntity<Map<String, String?>> =
         ResponseEntity.status(HttpStatus.NOT_FOUND).body(mapOf("error" to ex.message))
-}
 
+    /**
+     * Validation failures raised by `require(...)` in the service layer,
+     * e.g. linking objects that belong to different campaigns.
+     */
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleBadRequest(ex: IllegalArgumentException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to ex.message))
+}

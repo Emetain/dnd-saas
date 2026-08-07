@@ -56,6 +56,7 @@ class CampaignService(
             system = campaign.system,
             worldLore = campaign.worldLore,
             sessionCount = campaign.sessions.size,
+            characterCount = campaign.characters.size,
             createdAt = campaign.createdAt,
             updatedAt = campaign.updatedAt,
         )

@@ -29,5 +29,9 @@ class Campaign(
 
     @OneToMany(mappedBy = "campaign", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
     var sessions: MutableList<Session> = mutableListOf(),
+
+    /** The party — player characters taking part in this campaign. */
+    @OneToMany(mappedBy = "campaign", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
+    var characters: MutableList<Character> = mutableListOf(),
 ) : BaseEntity()
 

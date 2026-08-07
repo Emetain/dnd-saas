@@ -43,6 +43,43 @@ spring:
       path: /h2-console
 
 ---
+# Local PostgreSQL running via docker-compose.
+# Activate with: -Dspring.profiles.active=postgres  (or SPRING_PROFILES_ACTIVE=postgres)
+# Data survives restarts, unlike the in-memory H2 dev profile.
+spring:
+  config:
+    activate:
+      on-profile: postgres
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/dndsaas}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME:dndsaas}
+    password: ${DB_PASSWORD:dndsaas}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+---
+# The backend running inside docker-compose (talks to the "postgres" service).
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/dndsaas}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME:dndsaas}
+    password: ${DB_PASSWORD:dndsaas}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+---
 # Production profile: PostgreSQL (configure via environment variables)
 spring:
   config:
@@ -57,4 +94,3 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
-

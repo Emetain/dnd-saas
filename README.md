@@ -30,9 +30,45 @@ A SaaS application with a **separate Vue frontend** and a **Kotlin + Spring Boot
 Supporting packages: `domain/` (JPA entities), `dto/` (request/response objects),
 `config/` (CORS, etc.).
 
+## Database & Docker
+
+A `docker-compose.yml` in the repo root provides PostgreSQL and a database web UI.
+
+```bash
+cp .env.example .env          # first time only
+
+# Start only the database + Adminer (recommended for development)
+docker compose up -d postgres adminer
+
+# Or run everything, including the backend, in containers
+docker compose --profile full up --build
+```
+
+| Service | URL / Port | Notes |
+|---------|-----------|-------|
+| PostgreSQL | `localhost:5432` | db/user/password default to `dndsaas` |
+| Adminer (DB UI) | http://localhost:8081 | System **PostgreSQL**, server `postgres` |
+| Backend (`--profile full`) | http://localhost:8080/api | |
+
+### Spring profiles
+
+| Profile | Database | Data survives restart? | Use when |
+|---------|----------|------------------------|----------|
+| `dev` *(default)* | H2 in-memory | ❌ | Quick local runs, no Docker needed |
+| `postgres` | PostgreSQL on `localhost:5432` | ✅ | Developing against the real DB via Docker |
+| `docker` | PostgreSQL service `postgres` | ✅ | Backend running inside docker-compose |
+| `prod` | PostgreSQL from env vars | ✅ | Deployment (`ddl-auto: validate`) |
+
+To run the backend from IntelliJ against Docker PostgreSQL, add this to the run
+configuration's VM options:
+
+```
+-Dspring.profiles.active=postgres
+```
+
 ## Running the backend
 
-Requirements: JDK 21.
+Requirements: JDK 21+.
 
 ```bash
 cd backend
@@ -41,8 +77,6 @@ cd backend
 
 - Runs on `http://localhost:8080/api`
 - Dev profile uses an in-memory **H2** database (console at `/api/h2-console`).
-- Switch to PostgreSQL by running with `--args='--spring.profiles.active=prod'` and
-  setting `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`.
 
 ### API documentation (Swagger)
 
@@ -73,11 +107,69 @@ npm run dev
 - Runs on `http://localhost:5173`
 - Vite proxies `/api` calls to the backend at `http://localhost:8080`.
 
+## Campaign Memory
+
+The heart of the platform. Everything is stored as **structured, connected data**
+rather than blobs of AI text, so every generation can be grounded in the world
+that already exists.
+
+```
+Campaign
+ ├── Sessions            timeline of play
+ ├── Characters          the party (player characters)
+ ├── Locations           nested world hierarchy (region → village → building)
+ ├── Factions            organisations, goals, reputation with the party
+ ├── NPCs                linked to a location, a faction and sessions they appeared in
+ ├── Relationships       typed links between NPCs (sibling, rival, lover …)
+ ├── Quests              linked to a giver, a location and every NPC involved
+ ├── Items               owned by a character, an NPC, or lying in a location
+ └── World Events        what happened, when, and the consequences
+```
+
+`GET /api/v1/campaigns/{id}/memory` returns the whole graph in one structured
+payload — this is exactly what the AI service will collect as context in Phase 3.
+
 ## Example API
 
 ```
-POST /api/v1/characters      # create a character (returns calculated stats)
-GET  /api/v1/characters      # list all characters
-GET  /api/v1/characters/{id} # fetch one character
+POST   /api/v1/campaigns                          # create a campaign
+GET    /api/v1/campaigns                          # list campaigns
+GET    /api/v1/campaigns/{id}                     # campaign incl. session/character counts
+
+POST   /api/v1/campaigns/{id}/sessions            # add a session
+GET    /api/v1/campaigns/{id}/sessions            # campaign timeline
+
+POST   /api/v1/campaigns/{id}/characters          # add a player character to the party
+GET    /api/v1/campaigns/{id}/characters          # the party roster
+GET    /api/v1/characters/{id}                    # character incl. calculated stats
+GET    /api/v1/characters/{id}/inventory          # what they are carrying
+
+POST   /api/v1/campaigns/{id}/locations           # worldbuilding
+GET    /api/v1/campaigns/{id}/locations/roots     # top-level locations
+GET    /api/v1/locations/{id}/children            # what is inside a location
+
+POST   /api/v1/campaigns/{id}/factions            # organisations
+GET    /api/v1/factions/{id}/members              # its NPCs
+
+POST   /api/v1/campaigns/{id}/npcs                # NPCs
+GET    /api/v1/campaigns/{id}/npcs?status=ALIVE   # filtered
+GET    /api/v1/npcs/{id}/detail                   # NPC + relationships + quests + items
+POST   /api/v1/npcs/{id}/appearances/{sessionId}  # record a session appearance
+
+POST   /api/v1/campaigns/{id}/relationships       # link two NPCs
+GET    /api/v1/npcs/{id}/relationships            # every connection an NPC has
+
+POST   /api/v1/campaigns/{id}/quests              # quests
+GET    /api/v1/campaigns/{id}/quests/active       # what is in play right now
+
+POST   /api/v1/campaigns/{id}/items               # loot and artefacts
+POST   /api/v1/campaigns/{id}/events              # world events
+
+GET    /api/v1/campaigns/{id}/memory/stats        # memory counts (dashboard)
+GET    /api/v1/campaigns/{id}/memory              # ⭐ full structured snapshot
 ```
+
+See `backend/requests.http` for ready-to-run examples (executable from IntelliJ).
+
+
 

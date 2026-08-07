@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dndsaas-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dndsaas}
+      POSTGRES_USER: ${POSTGRES_USER:-dndsaas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dndsaas}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dndsaas} -d ${POSTGRES_DB:-dndsaas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Lightweight web UI for browsing the database at http://localhost:8081
+  adminer:
+    image: adminer:latest
+    container_name: dndsaas-adminer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8081:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: dracula
+
+  # The Spring Boot backend. Only started with the "full" profile:
+  #   docker compose --profile full up
+  # For day-to-day development, run the backend from IntelliJ instead and use
+  # only the postgres + adminer containers.
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dndsaas-backend
+    restart: unless-stopped
+    profiles: ["full"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dndsaas}
+      DB_USERNAME: ${POSTGRES_USER:-dndsaas}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-dndsaas}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+volumes:
+  postgres-data:
+

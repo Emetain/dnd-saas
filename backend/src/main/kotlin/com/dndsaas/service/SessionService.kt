@@ -49,11 +49,11 @@ class SessionService(
 
     fun delete(id: Long) = sessionRepository.deleteById(id)
 
-    private fun findEntity(id: Long): Session =
+    fun findEntity(id: Long): Session =
         sessionRepository.findById(id)
             .orElseThrow { NoSuchElementException("Session $id not found") }
 
-    private fun toResponse(session: Session): SessionResponse =
+    fun toResponse(session: Session): SessionResponse =
         SessionResponse(
             id = session.id!!,
             campaignId = session.campaign!!.id!!,

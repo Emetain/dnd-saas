@@ -27,5 +27,16 @@ class CharacterCalculationService {
 
     fun abilityModifiers(character: Character): Map<String, Int> =
         abilityScores(character).mapValues { (_, score) -> abilityModifier(score) }
-}
 
+    /**
+     * Saving throw bonuses. Currently the raw ability modifier for each ability;
+     * class proficiencies can be layered on here later.
+     */
+    fun savingThrows(character: Character): Map<String, Int> = abilityModifiers(character)
+
+    /** Initiative bonus = dexterity modifier. */
+    fun initiative(character: Character): Int = abilityModifier(character.dexterity)
+
+    /** Passive Perception = 10 + wisdom modifier. */
+    fun passivePerception(character: Character): Int = 10 + abilityModifier(character.wisdom)
+}

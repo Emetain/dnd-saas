@@ -1,65 +1,45 @@
 package com.dndsaas.orchestration
 
-import com.dndsaas.domain.Character
+import com.dndsaas.dto.CharacterRequest
 import com.dndsaas.dto.CharacterResponse
-import com.dndsaas.dto.CreateCharacterRequest
-import com.dndsaas.repository.CharacterRepository
-import com.dndsaas.service.CharacterCalculationService
+import com.dndsaas.service.CampaignService
+import com.dndsaas.service.CharacterService
 import org.springframework.stereotype.Component
 
 /**
- * Orchestration (middle) layer.
+ * Orchestration (middle) layer for player characters.
  *
  * The controller hands a task to this layer. This layer decides *what* needs to
- * happen and coordinates the other layers — it delegates calculations to the
- * service layer and persistence to the repository — then assembles the result.
+ * happen and coordinates the services required — here it resolves the campaign
+ * a character belongs to before delegating the work to the character service.
  *
- * It contains NO game-rule math itself; that belongs to the service layer.
+ * It contains NO game-rule math and NO persistence code itself.
  */
 @Component
 class CharacterOrchestrator(
-    private val characterRepository: CharacterRepository,
-    private val calculationService: CharacterCalculationService,
+    private val characterService: CharacterService,
+    private val campaignService: CampaignService,
 ) {
 
-    /** Task: create a character, persist it, then return calculated stats. */
-    fun createCharacter(request: CreateCharacterRequest): CharacterResponse {
-        val character = Character(
-            name = request.name,
-            characterClass = request.characterClass,
-            level = request.level,
-            strength = request.strength,
-            dexterity = request.dexterity,
-            constitution = request.constitution,
-            intelligence = request.intelligence,
-            wisdom = request.wisdom,
-            charisma = request.charisma,
-        )
-        val saved = characterRepository.save(character)
-        return toResponse(saved)
+    /** Task: add a character to a campaign's party. */
+    fun addCharacterToCampaign(campaignId: Long, request: CharacterRequest): CharacterResponse {
+        val campaign = campaignService.findEntity(campaignId)
+        return characterService.create(campaign, request)
     }
 
-    /** Task: fetch a character and return calculated stats. */
-    fun getCharacter(id: Long): CharacterResponse {
-        val character = characterRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Character $id not found") }
-        return toResponse(character)
+    /** Task: list the party roster of a campaign. */
+    fun listCampaignCharacters(campaignId: Long): List<CharacterResponse> {
+        // Ensures a 404 is returned for an unknown campaign instead of an empty list.
+        campaignService.findEntity(campaignId)
+        return characterService.listByCampaign(campaignId)
     }
 
-    /** Task: list all characters with calculated stats. */
-    fun listCharacters(): List<CharacterResponse> =
-        characterRepository.findAll().map(::toResponse)
+    fun getCharacter(id: Long): CharacterResponse = characterService.get(id)
 
-    /** Assembles a response, delegating all math to the service layer. */
-    private fun toResponse(character: Character): CharacterResponse =
-        CharacterResponse(
-            id = character.id!!,
-            name = character.name,
-            characterClass = character.characterClass,
-            level = character.level,
-            abilityScores = calculationService.abilityScores(character),
-            abilityModifiers = calculationService.abilityModifiers(character),
-            proficiencyBonus = calculationService.proficiencyBonus(character.level),
-        )
+    fun updateCharacter(id: Long, request: CharacterRequest): CharacterResponse =
+        characterService.update(id, request)
+
+    fun deleteCharacter(id: Long) = characterService.delete(id)
+
+    fun listCharacters(): List<CharacterResponse> = characterService.listAll()
 }
-

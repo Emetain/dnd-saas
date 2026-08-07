@@ -82,32 +82,419 @@ Accept: application/json
 
 
 ### =====================================================================
-### CHARACTERS — best proof the SERVICE layer works, because the
-###               response contains CALCULATED values that were never sent.
+### CHARACTERS — the party playing in a campaign.
+###   Also the best proof the SERVICE layer works, because the response
+###   contains CALCULATED values that were never sent.
 ### =====================================================================
 
-### 11. Create a character.
+### 11. Add a player character to campaign 1.
 ###     Note: we send raw ability scores only.
-###     Expect the response to also contain "abilityModifiers" and
-###     "proficiencyBonus", which the CharacterCalculationService computed:
-###       strength 16  -> modifier +3
-###       dexterity 14 -> modifier +2
-###       level 5      -> proficiencyBonus 3
-POST http://localhost:8080/api/v1/characters
+###     Expect the response to also contain calculated fields:
+###       strength 16  -> abilityModifiers.strength  = +3
+###       dexterity 14 -> initiative                 = +2
+###       wisdom 12    -> passivePerception          = 11
+###       level 5      -> proficiencyBonus           = 3
+POST http://localhost:8080/api/v1/campaigns/1/characters
 Content-Type: application/json
 
 {
   "name": "Aria the Bold",
+  "playerName": "Jay",
   "characterClass": "Fighter",
+  "race": "Human",
+  "background": "Soldier",
   "level": 5,
   "strength": 16,
   "dexterity": 14,
   "constitution": 15,
   "intelligence": 10,
   "wisdom": 12,
-  "charisma": 8
+  "charisma": 8,
+  "maxHitPoints": 44,
+  "armorClass": 17,
+  "backstory": "A veteran of the border wars, searching for her missing brother."
 }
 
-### 12. List characters (calculated values should appear again)
+### 12. Add a second party member
+POST http://localhost:8080/api/v1/campaigns/1/characters
+Content-Type: application/json
+
+{
+  "name": "Wren Nightwhisper",
+  "playerName": "Sam",
+  "characterClass": "Rogue",
+  "race": "Half-Elf",
+  "background": "Criminal",
+  "level": 5,
+  "strength": 8,
+  "dexterity": 18,
+  "constitution": 12,
+  "intelligence": 14,
+  "wisdom": 13,
+  "charisma": 15,
+  "maxHitPoints": 33,
+  "armorClass": 15,
+  "backstory": "Fled the thieves' guild of Waterdeep with a stolen ledger."
+}
+
+### 13. List the party of campaign 1 (both characters, ordered by name)
+GET http://localhost:8080/api/v1/campaigns/1/characters
+Accept: application/json
+
+### 14. Get one character (with all calculated stats)
+GET http://localhost:8080/api/v1/characters/1
+Accept: application/json
+
+### 15. Update a character (e.g. level up + damage taken)
+PUT http://localhost:8080/api/v1/characters/1
+Content-Type: application/json
+
+{
+  "name": "Aria the Bold",
+  "playerName": "Jay",
+  "characterClass": "Fighter",
+  "race": "Human",
+  "background": "Soldier",
+  "level": 9,
+  "strength": 18,
+  "dexterity": 14,
+  "constitution": 16,
+  "intelligence": 10,
+  "wisdom": 12,
+  "charisma": 8,
+  "maxHitPoints": 80,
+  "currentHitPoints": 52,
+  "armorClass": 18,
+  "backstory": "A veteran of the border wars, now sworn to destroy Strahd.",
+  "active": true
+}
+
+### 16. Campaign now reports characterCount = 2 and sessionCount = 2
+GET http://localhost:8080/api/v1/campaigns/1
+Accept: application/json
+
+### 17. ERROR CASE: add a character to a campaign that does not exist
+###     Expect 404 + {"error": "Campaign 999 not found"}
+POST http://localhost:8080/api/v1/campaigns/999/characters
+Content-Type: application/json
+
+{
+  "name": "Ghost"
+}
+
+### 18. Delete a character (expect 204 No Content)
+DELETE http://localhost:8080/api/v1/characters/2
+
+### 19. List all characters across every campaign
 GET http://localhost:8080/api/v1/characters
 Accept: application/json
+
+
+### =====================================================================
+### PHASE 2 — CAMPAIGN MEMORY
+### Run these in order. They build a small, fully connected world.
+### =====================================================================
+
+### --- LOCATIONS (build a world hierarchy) ---
+
+### 20. A region (top-level location)
+POST http://localhost:8080/api/v1/campaigns/1/locations
+Content-Type: application/json
+
+{
+  "name": "Barovia",
+  "type": "REGION",
+  "description": "A cursed valley sealed off from the rest of the world by deadly mists.",
+  "atmosphere": "Perpetual grey twilight, the smell of wet earth, distant howling.",
+  "discovered": true
+}
+
+### 21. A village INSIDE Barovia (parentId = 1)
+POST http://localhost:8080/api/v1/campaigns/1/locations
+Content-Type: application/json
+
+{
+  "name": "Village of Barovia",
+  "type": "VILLAGE",
+  "description": "A miserable hamlet in the shadow of Castle Ravenloft.",
+  "atmosphere": "Shuttered windows, weeping heard behind closed doors.",
+  "parentId": 1,
+  "discovered": true
+}
+
+### 22. A castle, also inside Barovia
+POST http://localhost:8080/api/v1/campaigns/1/locations
+Content-Type: application/json
+
+{
+  "name": "Castle Ravenloft",
+  "type": "BUILDING",
+  "description": "The seat of Strahd von Zarovich, perched on a cliff of black rock.",
+  "parentId": 1
+}
+
+### 23. Top-level locations only (should return just Barovia)
+GET http://localhost:8080/api/v1/campaigns/1/locations/roots
+Accept: application/json
+
+### 24. What is inside Barovia? (should return the village and the castle)
+GET http://localhost:8080/api/v1/locations/1/children
+Accept: application/json
+
+
+### --- FACTIONS ---
+
+### 25. Create a faction based at Castle Ravenloft (location 3)
+POST http://localhost:8080/api/v1/campaigns/1/factions
+Content-Type: application/json
+
+{
+  "name": "The Cult of Strahd",
+  "type": "Cult",
+  "description": "Those who serve the vampire lord willingly.",
+  "goals": "Deliver Ireena Kolyana to their master.",
+  "ideology": "Death is a gift; Strahd is the only true power in Barovia.",
+  "status": "ACTIVE",
+  "headquartersId": 3,
+  "reputationWithParty": -60
+}
+
+
+### --- NPCs (linked to a location and a faction) ---
+
+### 26. The villain — lives in Castle Ravenloft, leads the cult
+POST http://localhost:8080/api/v1/campaigns/1/npcs
+Content-Type: application/json
+
+{
+  "name": "Strahd von Zarovich",
+  "race": "Vampire",
+  "occupation": "Lord of Barovia",
+  "role": "Villain",
+  "description": "The ancient vampire who rules the valley.",
+  "appearance": "Tall, pale, immaculately dressed in black and crimson.",
+  "personality": "Courteous, patient, utterly merciless.",
+  "motivation": "Reclaim the reincarnation of his lost love, Tatyana.",
+  "secret": "He cannot leave Barovia; the mists are his prison too.",
+  "voice": "Soft, cultured, never raised.",
+  "status": "ALIVE",
+  "disposition": "HOSTILE",
+  "locationId": 3,
+  "factionId": 1
+}
+
+### 27. An ally — lives in the village
+POST http://localhost:8080/api/v1/campaigns/1/npcs
+Content-Type: application/json
+
+{
+  "name": "Ireena Kolyana",
+  "race": "Human",
+  "occupation": "Burgomaster's daughter",
+  "role": "Quest objective",
+  "description": "A young woman hunted by Strahd.",
+  "motivation": "Protect her home and escape Strahd's attention.",
+  "secret": "She is the reincarnation of Tatyana.",
+  "status": "ALIVE",
+  "disposition": "FRIENDLY",
+  "locationId": 2
+}
+
+### 28. Her brother — also in the village
+POST http://localhost:8080/api/v1/campaigns/1/npcs
+Content-Type: application/json
+
+{
+  "name": "Ismark Kolyanovich",
+  "race": "Human",
+  "occupation": "Acting Burgomaster",
+  "role": "Quest giver",
+  "description": "Ireena's older brother, out of his depth but trying.",
+  "motivation": "Keep his sister alive.",
+  "status": "ALIVE",
+  "disposition": "ALLY",
+  "locationId": 2
+}
+
+### 29. List NPCs in the campaign
+GET http://localhost:8080/api/v1/campaigns/1/npcs
+Accept: application/json
+
+### 30. Filter NPCs by status
+GET http://localhost:8080/api/v1/campaigns/1/npcs?status=ALIVE
+Accept: application/json
+
+### 31. Who belongs to the Cult of Strahd? (should return Strahd)
+GET http://localhost:8080/api/v1/factions/1/members
+Accept: application/json
+
+
+### --- RELATIONSHIPS (the social web) ---
+
+### 32. Ismark is Ireena's brother
+POST http://localhost:8080/api/v1/campaigns/1/relationships
+Content-Type: application/json
+
+{
+  "fromNpcId": 3,
+  "toNpcId": 2,
+  "type": "SIBLING",
+  "description": "Ismark is Ireena's older brother and fiercely protective.",
+  "strength": 90,
+  "knownToPlayers": true
+}
+
+### 33. Strahd is obsessed with Ireena
+POST http://localhost:8080/api/v1/campaigns/1/relationships
+Content-Type: application/json
+
+{
+  "fromNpcId": 1,
+  "toNpcId": 2,
+  "type": "LOVER",
+  "description": "Strahd believes Ireena is Tatyana reborn and will not be denied.",
+  "strength": 100,
+  "knownToPlayers": false
+}
+
+### 34. Every connection Ireena has (should return both, in either direction)
+GET http://localhost:8080/api/v1/npcs/2/relationships
+Accept: application/json
+
+### 35. ERROR CASE: an NPC cannot relate to itself → 400 Bad Request
+POST http://localhost:8080/api/v1/campaigns/1/relationships
+Content-Type: application/json
+
+{
+  "fromNpcId": 1,
+  "toNpcId": 1,
+  "type": "RIVAL"
+}
+
+
+### --- QUESTS (connect NPCs and locations) ---
+
+### 36. A quest given by Ismark, involving Ireena and Strahd
+POST http://localhost:8080/api/v1/campaigns/1/quests
+Content-Type: application/json
+
+{
+  "title": "Escort Ireena to Vallaki",
+  "description": "Ismark asks the party to take his sister somewhere safer.",
+  "hook": "A desperate man buys the party a round of wine and asks for help.",
+  "objective": "Get Ireena to the walled town of Vallaki alive.",
+  "status": "ACTIVE",
+  "questGiverId": 3,
+  "locationId": 2,
+  "involvedNpcIds": [1, 2, 3],
+  "reward": "The gratitude of the Kolyana family and a sacred blade."
+}
+
+### 37. A rumoured quest
+POST http://localhost:8080/api/v1/campaigns/1/quests
+Content-Type: application/json
+
+{
+  "title": "The Tome of Strahd",
+  "description": "A book said to reveal the vampire's origins and weaknesses.",
+  "status": "RUMOURED",
+  "locationId": 3
+}
+
+### 38. What is currently in play? (RUMOURED + AVAILABLE + ACTIVE)
+GET http://localhost:8080/api/v1/campaigns/1/quests/active
+Accept: application/json
+
+### 39. Filter quests by a single status
+GET http://localhost:8080/api/v1/campaigns/1/quests?status=ACTIVE
+Accept: application/json
+
+
+### --- ITEMS ---
+
+### 40. A legendary item held by an NPC
+POST http://localhost:8080/api/v1/campaigns/1/items
+Content-Type: application/json
+
+{
+  "name": "Holy Symbol of Ravenkind",
+  "type": "Wondrous item",
+  "rarity": "LEGENDARY",
+  "description": "A platinum symbol set with a crystal of pure light.",
+  "properties": "Turn undead with advantage; can hold Strahd at bay.",
+  "history": "Lost for generations somewhere in the valley.",
+  "requiresAttunement": true,
+  "locationId": 3
+}
+
+### 41. Give an item to a player character (character 1)
+POST http://localhost:8080/api/v1/campaigns/1/items
+Content-Type: application/json
+
+{
+  "name": "Sunsword",
+  "type": "Weapon",
+  "rarity": "LEGENDARY",
+  "description": "A blade of pure radiance with no physical edge.",
+  "properties": "+3 longsword, deals radiant damage, sheds bright light.",
+  "requiresAttunement": true,
+  "ownerCharacterId": 1
+}
+
+### 42. That character's inventory
+GET http://localhost:8080/api/v1/characters/1/inventory
+Accept: application/json
+
+
+### --- WORLD EVENTS (the timeline) ---
+
+### 43. Record something that happened in session 1
+POST http://localhost:8080/api/v1/campaigns/1/events
+Content-Type: application/json
+
+{
+  "title": "The Mists Close Behind the Party",
+  "description": "The road out of Barovia vanished into impenetrable fog.",
+  "inGameDate": "12th of Eleint, 1492 DR",
+  "importance": "MAJOR",
+  "sessionId": 1,
+  "locationId": 1,
+  "consequences": "The party cannot leave the valley until Strahd is dealt with.",
+  "knownToPlayers": true
+}
+
+### 44. The campaign timeline
+GET http://localhost:8080/api/v1/campaigns/1/events
+Accept: application/json
+
+
+### --- SESSION APPEARANCES (NPC history) ---
+
+### 45. Record that Ireena appeared in session 2
+POST http://localhost:8080/api/v1/npcs/2/appearances/2
+
+### 46. And in session 1
+POST http://localhost:8080/api/v1/npcs/2/appearances/1
+
+
+### =====================================================================
+### THE PAYOFF — the two endpoints that prove Campaign Memory works
+### =====================================================================
+
+### 47. Everything connected to one NPC in a single call:
+###     who she is, who she knows, what she is involved in, what she carries.
+###     This needs FOUR services, coordinated by NpcOrchestrator.
+GET http://localhost:8080/api/v1/npcs/2/detail
+Accept: application/json
+
+### 48. Memory counts for the campaign dashboard
+GET http://localhost:8080/api/v1/campaigns/1/memory/stats
+Accept: application/json
+
+### 49. ⭐ THE FULL SNAPSHOT — everything the app remembers about this campaign.
+###     This exact payload is what the AI service will use as context in
+###     Phase 3, so generated content always fits the existing world.
+GET http://localhost:8080/api/v1/campaigns/1/memory
+Accept: application/json
+
+

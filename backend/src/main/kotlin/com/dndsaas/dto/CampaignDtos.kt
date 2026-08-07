@@ -18,6 +18,7 @@ data class CampaignResponse(
     val system: String,
     val worldLore: String,
     val sessionCount: Int,
+    val characterCount: Int,
     val createdAt: Instant,
     val updatedAt: Instant,
 )

@@ -8,5 +8,10 @@ import org.springframework.stereotype.Repository
  * Data-access layer. Spring Data JPA generates the implementation.
  */
 @Repository
-interface CharacterRepository : JpaRepository<Character, Long>
+interface CharacterRepository : JpaRepository<Character, Long> {
 
+    /** The party roster of a campaign, ordered by name. */
+    fun findByCampaignIdOrderByNameAsc(campaignId: Long): List<Character>
+
+    fun countByCampaignId(campaignId: Long): Long
+}
