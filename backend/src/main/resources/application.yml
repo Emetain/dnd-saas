@@ -19,6 +19,16 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 
+# AI provider configuration.
+# The key is NEVER stored here — it is read from the OPENAI_API_KEY environment
+# variable so it can never be committed to the repository.
+app:
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    base-url: https://api.openai.com/v1
+    model: gpt-4o-mini
+    timeout-seconds: 60
+
 ---
 # Development profile: in-memory H2 database
 spring:

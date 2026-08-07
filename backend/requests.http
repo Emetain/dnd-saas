@@ -23,11 +23,11 @@ GET http://localhost:8080/api/v1/campaigns
 Accept: application/json
 
 ### 4. Get a single campaign by id
-GET http://localhost:8080/api/v1/campaigns/1
+GET http://localhost:8080/api/v1/campaigns/2
 Accept: application/json
 
 ### 5. Update the campaign (expect the new name in the response)
-PUT http://localhost:8080/api/v1/campaigns/1
+PUT http://localhost:8080/api/v1/campaigns/2
 Content-Type: application/json
 
 {
@@ -49,7 +49,7 @@ Accept: application/json
 ### =====================================================================
 
 ### 7. Add a session to campaign 1 (expect 201)
-POST http://localhost:8080/api/v1/campaigns/1/sessions
+POST http://localhost:8080/api/v1/campaigns/2/sessions
 Content-Type: application/json
 
 {
@@ -61,7 +61,7 @@ Content-Type: application/json
 }
 
 ### 8. Add a second session
-POST http://localhost:8080/api/v1/campaigns/1/sessions
+POST http://localhost:8080/api/v1/campaigns/2/sessions
 Content-Type: application/json
 
 {
@@ -73,7 +73,7 @@ Content-Type: application/json
 }
 
 ### 9. List sessions for campaign 1 (should return both, ordered by sessionNumber)
-GET http://localhost:8080/api/v1/campaigns/1/sessions
+GET http://localhost:8080/api/v1/campaigns/2/sessions
 Accept: application/json
 
 ### 10. Get one session directly
