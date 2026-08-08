@@ -692,11 +692,15 @@ Content-Type: application/json
   "playerCount": 5,
   "startingLevel": 1,
   "expectedLength": "long campaign, 1 to 12",
-  "questionCount": 6
+  "questionCount": 6,
+  "mock": false
 }
 
-### 66. STEP 2 for real: paste YOUR answers from #65 below, then run this.
-###     The generated campaign should visibly honour every answer you gave.
+### 66. STEP 2 for real: the answers below came from the interview in #65.
+###     The generated campaign should visibly honour EVERY one of them —
+###     look for a villain flattening histories into one narrative, a party
+###     pulled in by an accidental discovery, and an ending built around
+###     choosing which truth survives.
 POST http://localhost:8080/api/v1/ai/campaign-generator/generate
 Content-Type: application/json
 
@@ -710,17 +714,43 @@ Content-Type: application/json
   "expectedLength": "long campaign, 1 to 12",
   "answers": [
     {
-      "questionId": "replace_me",
-      "question": "paste a question from the interview response",
-      "answer": "your answer"
+      "questionId": "central_conflict",
+      "question": "What central conflict drives the players to explore these islands?",
+      "answer": "A mysterious force is erasing histories from the islands, and the players must uncover the truth."
+    },
+    {
+      "questionId": "villain_motivation",
+      "question": "What does the main villain want in relation to the islands' histories?",
+      "answer": "To erase all conflicting histories and create a singular narrative."
+    },
+    {
+      "questionId": "player_involvement",
+      "question": "Why are the players specifically involved in the conflict over these islands?",
+      "answer": "They accidentally uncover a secret that draws them into the conflict."
+    },
+    {
+      "questionId": "desired_player_experience",
+      "question": "What feelings do you want the players to experience as they explore the islands?",
+      "answer": "A sense of wonder mixed with discomfort."
+    },
+    {
+      "questionId": "content_limits",
+      "question": "Are there any themes or content that you want to avoid in the campaign?",
+      "answer": "Graphic depictions of colonization and its effects."
+    },
+    {
+      "questionId": "campaign_ending",
+      "question": "How do you envision the campaign concluding after the journey through the islands?",
+      "answer": "The players must choose which version of history to endorse or erase."
     }
   ],
-  "additionalNotes": "",
+  "additionalNotes": "The conflicting island histories should be an investigable puzzle, not just backdrop. Keep the colonial themes present but handled with restraint. Starting at level 1, so the first island should feel small and personal.",
   "locationCount": 6,
   "factionCount": 3,
   "npcCount": 8,
   "questCount": 5,
-  "temperature": 0.9
+  "temperature": 0.9,
+  "mock": false
 }
 
 ### 67. Generating without doing the interview also works — the answers
@@ -737,7 +767,3 @@ Content-Type: application/json
   "npcCount": 5,
   "questCount": 3
 }
-
-
-
-
