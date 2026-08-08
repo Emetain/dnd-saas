@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+
+# Kotlin / Java build output
+*.class
+out/
+bin/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Local env / secrets
+.env
+.env.local
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
