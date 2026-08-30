@@ -47,5 +47,14 @@ class CampaignGeneratorController(
     )
     fun generate(@RequestBody request: CampaignGenerationRequest): ResponseEntity<CampaignGenerationResult> =
         ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.generate(request))
+
+    @PostMapping("/one-shot")
+    @Operation(
+        summary = "Generate a complete one-shot adventure",
+        description = "Creates a compact, connected adventure with a decisive ending, " +
+            "saved as a campaign and structured Campaign Memory.",
+    )
+    fun generateOneShot(@RequestBody request: CampaignGenerationRequest): ResponseEntity<CampaignGenerationResult> =
+        ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.generateOneShot(request))
 }
 

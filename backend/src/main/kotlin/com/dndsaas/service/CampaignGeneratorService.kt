@@ -207,6 +207,17 @@ class CampaignGeneratorService(
         - Write the world lore as flowing prose, not bullet points.
     """.trimIndent()
 
+    private val oneShotGuidance = """
+        This is a one-shot for a single sitting, not the opening chapter of a campaign.
+
+        Requirements:
+        - Keep the scope compact enough to finish in the expected play time.
+        - Give the party a clear objective, meaningful escalation and a decisive finale.
+        - Make every generated NPC, location and quest serve this one adventure.
+        - Use the cliffhanger field for the complete resolution and aftermath, not a sequel hook.
+        - The first session plan must cover the entire adventure from opening scene to ending.
+    """.trimIndent()
+
     @Transactional
     fun generate(request: CampaignGenerationRequest): CampaignGenerationResult =
         generateInternal(request, GenerationType.CAMPAIGN, oneShot = false)
