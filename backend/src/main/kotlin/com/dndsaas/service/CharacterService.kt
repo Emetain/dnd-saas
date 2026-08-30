@@ -47,6 +47,13 @@ class CharacterService(
 
     fun delete(id: Long) = characterRepository.deleteById(id)
 
+    /** Sets a character's backstory directly — used by the backstory generator. */
+    fun updateBackstory(id: Long, backstory: String): CharacterResponse {
+        val character = findEntity(id)
+        character.backstory = backstory
+        return toResponse(characterRepository.save(character))
+    }
+
     fun findEntity(id: Long): Character =
         characterRepository.findById(id)
             .orElseThrow { NoSuchElementException("Character $id not found") }

@@ -31,6 +31,7 @@ class CampaignMemoryService(
     private val relationshipService: RelationshipService,
     private val characterService: CharacterService,
     private val sessionService: SessionService,
+    private val encounterService: EncounterService,
     private val generationLogService: GenerationLogService,
     private val sessionRepository: SessionRepository,
     private val characterRepository: CharacterRepository,
@@ -49,6 +50,7 @@ class CampaignMemoryService(
             relationships = relationshipService.countForCampaign(campaignId),
             sessions = sessionRepository.countByCampaignId(campaignId),
             characters = characterRepository.countByCampaignId(campaignId),
+            encounters = encounterService.countForCampaign(campaignId),
         )
     }
 
@@ -67,6 +69,7 @@ class CampaignMemoryService(
             relationships = relationshipService.listByCampaign(campaignId),
             characters = characterService.listByCampaign(campaignId),
             sessions = sessionService.listForCampaign(campaignId),
+            encounters = encounterService.listByCampaign(campaignId),
         )
     }
 
@@ -77,6 +80,7 @@ class CampaignMemoryService(
     @Transactional
     fun deleteAllForCampaign(campaignId: Long) {
         generationLogService.deleteAllForCampaign(campaignId)
+        encounterService.deleteAllForCampaign(campaignId)
         relationshipService.deleteAllForCampaign(campaignId)
         itemService.deleteAllForCampaign(campaignId)
         worldEventService.deleteAllForCampaign(campaignId)

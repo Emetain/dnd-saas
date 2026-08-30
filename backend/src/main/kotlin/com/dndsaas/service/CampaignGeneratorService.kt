@@ -208,11 +208,47 @@ class CampaignGeneratorService(
     """.trimIndent()
 
     @Transactional
-    fun generate(request: CampaignGenerationRequest): CampaignGenerationResult {
+    fun generate(request: CampaignGenerationRequest): CampaignGenerationResult =
+        generateInternal(request, GenerationType.CAMPAIGN, oneShot = false)
+
+    /**
+     * Generates a self-contained one-shot: a small, fully connected world sized
+     * for a single sitting, with an ending baked in rather than a cliffhanger.
+     *
+     * Reuses the same blueprint shape and persistence as a full campaign — a
+     * one-shot is simply a campaign with tighter scope and a resolution.
+     */
+    @Transactional
+    fun generateOneShot(request: CampaignGenerationRequest): CampaignGenerationResult =
+        generateInternal(
+            request.copy(
+                locationCount = request.locationCount.coerceAtMost(3),
+                factionCount = request.factionCount.coerceAtMost(1),
+                npcCount = request.npcCount.coerceAtMost(4),
+                questCount = request.questCount.coerceAtMost(1),
+                additionalNotes = buildString {
+                    append(request.additionalNotes)
+                    if (request.additionalNotes.isNotBlank()) appendLine()
+                    append(
+                        "This is a ONE-SHOT: everything must be resolvable in a single sitting. " +
+                            "The first (only) session must end with a genuine resolution, not a " +
+                            "cliffhanger — put the ending in the cliffhanger field.",
+                    )
+                },
+            ),
+            GenerationType.ONE_SHOT,
+            oneShot = true,
+        )
+
+    private fun generateInternal(
+        request: CampaignGenerationRequest,
+        generationType: GenerationType,
+        oneShot: Boolean,
+    ): CampaignGenerationResult {
         val startedAt = System.currentTimeMillis()
 
         val instruction = buildString {
-            appendLine("Design a complete campaign.")
+            appendLine(if (oneShot) "Design a self-contained one-shot adventure." else "Design a complete campaign.")
             appendLine()
             appendLine("## The Dungeon Master's idea")
             appendLine(request.idea.ifBlank { "(none given — invent something memorable)" })
@@ -246,14 +282,14 @@ class CampaignGeneratorService(
         val response = aiService.generate(
             campaign = null,
             request = GenerationRequest(
-                type = GenerationType.CAMPAIGN,
+                type = generationType,
                 instruction = instruction,
                 temperature = request.temperature,
                 mock = request.mock,
             ),
             jsonSchema = blueprintSchema(request),
             requiredFields = listOf("name", "worldLore"),
-            systemGuidance = blueprintGuidance,
+            systemGuidance = if (oneShot) "$blueprintGuidance\n\n$oneShotGuidance" else blueprintGuidance,
         )
 
         val blueprint = objectMapper.treeToValue(response.content, CampaignBlueprint::class.java)

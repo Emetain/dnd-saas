@@ -24,6 +24,10 @@ class GenerationLogService(
     private val generationLogRepository: GenerationLogRepository,
 ) {
 
+    fun findEntity(id: Long): GenerationLog =
+        generationLogRepository.findById(id)
+            .orElseThrow { NoSuchElementException("Generation log $id not found") }
+
     fun recordSuccess(
         campaign: Campaign?,
         type: GenerationType,

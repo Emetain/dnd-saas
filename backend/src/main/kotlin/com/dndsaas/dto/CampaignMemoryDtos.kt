@@ -13,9 +13,10 @@ data class CampaignMemoryStats(
     val relationships: Long,
     val sessions: Long,
     val characters: Long,
+    val encounters: Long = 0,
 ) {
     val total: Long
-        get() = locations + factions + npcs + quests + items + worldEvents + relationships
+        get() = locations + factions + npcs + quests + items + worldEvents + relationships + encounters
 }
 
 /**
@@ -38,5 +39,6 @@ data class CampaignMemorySnapshot(
     val relationships: List<RelationshipResponse>,
     val characters: List<CharacterResponse>,
     val sessions: List<SessionResponse>,
+    val encounters: List<EncounterResponse> = emptyList(),
 )
 
