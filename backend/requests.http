@@ -767,3 +767,267 @@ Content-Type: application/json
   "npcCount": 5,
   "questCount": 3
 }
+
+### =====================================================================
+### PHASE 5 — BILLING, SUBSCRIPTIONS & FREE TIER EARNINGS
+###
+### Tests user accounts, tokens, subscriptions, and free tier earning.
+### All free tier tests use "mock": true equivalent (no real charges).
+### =====================================================================
+
+### --- USER MANAGEMENT ---
+
+### 70. Register a new user account
+###     Expect 201 Created. User should have 50 starting tokens.
+POST http://localhost:8080/v1/users/register
+Content-Type: application/json
+
+{
+  "email": "dm@example.com",
+  "displayName": "Dungeon Master",
+  "password": "secure_password_123"
+}
+
+### 71. Get user account info
+###     Should show subscriptionTier = FREE, platformTokens = 50
+GET http://localhost:8080/v1/users/1
+Accept: application/json
+
+### 72. Register another user (for referral tests later)
+POST http://localhost:8080/v1/users/register
+Content-Type: application/json
+
+{
+  "email": "player@example.com",
+  "displayName": "Player One",
+  "password": "player_password_123"
+}
+
+
+### --- TOKEN MANAGEMENT ---
+
+### 73. Check token balance for user 1
+###     Should show currentTokens = 50, monthlyAllowance = 50 (FREE tier)
+GET http://localhost:8080/v1/users/1/tokens
+Accept: application/json
+
+### 74. Get token transaction history (should be empty on fresh account)
+GET http://localhost:8080/v1/users/1/tokens/history
+Accept: application/json
+
+
+### --- FREE TIER EARNING: AD VIEWING ---
+
+### 75. Get all earning opportunities for user 1
+###     Should show ads available, referral code, login streak, app reviews
+GET http://localhost:8080/v1/users/1/earn
+Accept: application/json
+
+### 76. Watch an ad and earn tokens
+###     Expect 5 tokens earned. Status 200 if successful, 409 if daily limit reached
+POST http://localhost:8080/v1/users/1/earn/ads/watch
+Content-Type: application/json
+
+{
+  "adId": "google_admob_campaign_001",
+  "adDetails": "Game offer from AdNetwork"
+}
+
+### 77. Watch another ad
+POST http://localhost:8080/v1/users/1/earn/ads/watch
+Content-Type: application/json
+
+{
+  "adId": "google_admob_campaign_002",
+  "adDetails": "Learning app offer"
+}
+
+### 78. Check balance after ads (should be 60 tokens now: 50 + 5 + 5)
+GET http://localhost:8080/v1/users/1/tokens
+Accept: application/json
+
+### 79. Try to watch the same ad twice immediately (should fail — cooldown enforced)
+###     Expect 409 Conflict — cooldown still active
+POST http://localhost:8080/v1/users/1/earn/ads/watch
+Content-Type: application/json
+
+{
+  "adId": "google_admob_campaign_001",
+  "adDetails": "Game offer from AdNetwork"
+}
+
+
+### --- FREE TIER EARNING: LOGIN STREAKS ---
+
+### 80. Record a login and claim daily bonus
+###     First login of the day: expect 1 token earned
+POST http://localhost:8080/v1/users/1/earn/login
+Accept: application/json
+
+### 81. Get user's login streak info
+###     Should show currentStreak = 1, longestStreak = 1, tokensEarned = 1
+GET http://localhost:8080/v1/users/1/earn/login-streak
+Accept: application/json
+
+### 82. Try to login again same day (should return 0 tokens — already logged in today)
+POST http://localhost:8080/v1/users/1/earn/login
+Accept: application/json
+
+### 83. Check balance (should still be 61 tokens: 60 + 1 from login)
+GET http://localhost:8080/v1/users/1/tokens
+Accept: application/json
+
+
+### --- FREE TIER EARNING: REFERRAL PROGRAM ---
+
+### 84. Get referral stats and code for user 1
+###     Should show unique referral code and stats
+GET http://localhost:8080/v1/users/1/earn/referral
+Accept: application/json
+
+### 85. Generate a new referral code for user 1
+POST http://localhost:8080/v1/users/1/earn/referral/generate-code
+Accept: application/json
+
+### 86. Apply referral code during user 2 signup
+###     (In real app, this happens during registration, but testing after-the-fact here)
+POST http://localhost:8080/v1/users/2/earn/referral/apply
+Content-Type: application/json
+
+{
+  "referralCode": "REF_ABC123XYZ"
+}
+
+### 87. Check referral stats for user 1 (should show 1 invited)
+GET http://localhost:8080/v1/users/1/earn/referral
+Accept: application/json
+
+
+### --- FREE TIER EARNING: APP REVIEWS ---
+
+### 88. Submit an app review on Google Play Store
+###     Expect 25 tokens earned, 201 Created (first time)
+POST http://localhost:8080/v1/users/1/earn/app-review
+Content-Type: application/json
+
+{
+  "platformId": "google_play",
+  "reviewUrl": "https://play.google.com/store/apps/details?id=com.dndsaas&review=123",
+  "reviewContent": "Amazing app for DMs! Love the world-building tools."
+}
+
+### 89. Try to submit another review on Google Play (should fail — already rewarded on this platform)
+###     Expect 409 Conflict, tokensEarned = 0
+POST http://localhost:8080/v1/users/1/earn/app-review
+Content-Type: application/json
+
+{
+  "platformId": "google_play",
+  "reviewUrl": "https://play.google.com/store/apps/details?id=com.dndsaas&review=456",
+  "reviewContent": "Still amazing!"
+}
+
+### 90. Submit review on App Store (different platform, should work)
+###     Expect 25 tokens earned
+POST http://localhost:8080/v1/users/1/earn/app-review
+Content-Type: application/json
+
+{
+  "platformId": "app_store",
+  "reviewUrl": "https://apps.apple.com/app/id123456?action=write-review",
+  "reviewContent": "Best campaign planner for D&D."
+}
+
+### 91. Check balance after reviews (should be 61 + 25 + 25 = 111 tokens)
+GET http://localhost:8080/v1/users/1/tokens
+Accept: application/json
+
+### 92. Get token transaction history (should show all transactions: ads, login, reviews)
+GET http://localhost:8080/v1/users/1/tokens/history?limit=10
+Accept: application/json
+
+
+### --- SUBSCRIPTION MANAGEMENT ---
+
+### 93. Get subscription details for user 1 (currently FREE tier)
+###     Should show monthlyAllowance = 50, billingCycleEnd = ~30 days from now
+GET http://localhost:8080/v1/users/1/subscription
+Accept: application/json
+
+### 94. Upgrade user 1 to Pro tier
+###     Expect 1,000 tokens granted immediately, subscription created
+POST http://localhost:8080/v1/users/1/subscription/upgrade
+Content-Type: application/json
+
+{
+  "tier": "PRO"
+}
+
+### 95. Check balance after upgrade (should be 111 + 1000 = 1111 tokens)
+GET http://localhost:8080/v1/users/1/subscription
+Accept: application/json
+
+### 96. Check token balance (should reflect the upgrade)
+GET http://localhost:8080/v1/users/1/tokens
+Accept: application/json
+
+### 97. Upgrade to Pro+ tier
+POST http://localhost:8080/v1/users/1/subscription/upgrade
+Content-Type: application/json
+
+{
+  "tier": "PRO_PLUS"
+}
+
+### 98. Check Pro+ details (should show 3,000 monthly tokens)
+GET http://localhost:8080/v1/users/1/subscription
+Accept: application/json
+
+### 99. Downgrade back to FREE
+POST http://localhost:8080/v1/users/1/subscription/downgrade-free
+Accept: application/json
+
+### 100. Confirm downgrade (should be back to FREE tier with 2,000 remaining balance)
+GET http://localhost:8080/v1/users/1/subscription
+Accept: application/json
+
+
+### --- TOTAL FREE TIER EARNINGS ---
+
+### 101. Get total tokens earned from all free sources
+###      Should show sum of ad views, referrals, login streaks, app reviews
+GET http://localhost:8080/v1/users/1/earn/total
+Accept: application/json
+
+### 102. Full earning opportunities dashboard
+###      Should show all 5 earning methods with current status and limits
+GET http://localhost:8080/v1/users/1/earn
+Accept: application/json
+
+
+### --- ERROR CASES ---
+
+### 103. ERROR: Try to get account that doesn't exist (user 999)
+###      Expect 404 Not Found
+GET http://localhost:8080/v1/users/999
+Accept: application/json
+
+### 104. ERROR: Try to upgrade with invalid tier
+POST http://localhost:8080/v1/users/1/subscription/upgrade
+Content-Type: application/json
+
+{
+  "tier": "INVALID_TIER"
+}
+
+### 105. ERROR: Register with email that already exists
+###      Expect 400 Bad Request
+POST http://localhost:8080/v1/users/register
+Content-Type: application/json
+
+{
+  "email": "dm@example.com",
+  "displayName": "Another DM",
+  "password": "password"
+}
+

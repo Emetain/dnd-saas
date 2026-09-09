@@ -12,3 +12,11 @@
 -- campaign exists, so generation_logs.campaign_id must allow nulls.
 ALTER TABLE generation_logs ALTER COLUMN campaign_id DROP NOT NULL;
 
+-- Phase 5 (Billing, Subscriptions & Free Tier Earnings)
+-- Add user_id foreign key to campaigns
+ALTER TABLE campaigns ADD COLUMN user_id BIGINT NOT NULL DEFAULT 1;
+ALTER TABLE campaigns ADD CONSTRAINT fk_campaign_user FOREIGN KEY (user_id) REFERENCES users(id);
+
+-- Drop the default constraint from the column now that it's been populated
+ALTER TABLE campaigns ALTER COLUMN user_id DROP DEFAULT;
+

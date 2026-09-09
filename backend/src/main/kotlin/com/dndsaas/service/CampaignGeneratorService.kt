@@ -449,6 +449,8 @@ class CampaignGeneratorService(
             ),
         )
 
+
+
         log.info(
             "Generated campaign '{}' (id={}) with {} locations, {} factions, {} NPCs, {} quests",
             campaignResponse.name, campaignResponse.id,

@@ -4,6 +4,9 @@ import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
+import jakarta.persistence.ForeignKey
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.ManyToOne
 import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 
@@ -15,6 +18,10 @@ import jakarta.persistence.Table
 @Entity
 @Table(name = "campaigns")
 class Campaign(
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "user_id", foreignKey = ForeignKey(name = "fk_campaign_user"))
+    var user: User? = null,
+
     var name: String = "",
 
     @Column(columnDefinition = "TEXT")
