@@ -29,5 +29,9 @@ class CampaignGeneratorOrchestrator(
      */
     fun generate(request: CampaignGenerationRequest): CampaignGenerationResult =
         campaignGeneratorService.generate(request)
+
+    /** Task: build a complete, self-contained adventure for one sitting. */
+    fun generateOneShot(request: CampaignGenerationRequest): CampaignGenerationResult =
+        campaignGeneratorService.generateOneShot(request)
 }
 
