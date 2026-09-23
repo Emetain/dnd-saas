@@ -73,6 +73,8 @@ data class TokenEarnedResponse(
 data class SubscriptionDetailsResponse(
     val userId: Long,
     val currentTier: SubscriptionTier,
+    /** True when the plan is billed by Stripe; changes then go through the Customer Portal. */
+    val managedByStripe: Boolean,
     /** A downgrade that takes effect at [billingCycleEnd], or null. */
     val pendingTier: SubscriptionTier?,
     val monthlyTokenAllowance: Long,
@@ -150,3 +152,11 @@ data class AppReviewResponse(
     val reviewUrl: String,
 )
 
+
+/** A one-time ticket for one rewarded ad; redeem it once the ad has been watched. */
+data class AdTicketResponse(
+    val ticket: String,
+    /** The ticket cannot be redeemed sooner than this. */
+    val minWatchSeconds: Long,
+    val tokensReward: Long,
+)

@@ -41,6 +41,10 @@ class SubscriptionService(
         val user = userService.findEntity(userId)
         val current = user.subscriptionTier
         val subscription = subscriptionRepository.findByUserAndIsActiveTrue(user)
+        // A plan that Stripe bills is only ever changed through Stripe (the Customer Portal).
+        if (subscription?.stripeSubscriptionId != null) {
+            throw AlreadySubscribedException("Change your plan with “Manage subscription”")
+        }
 
         when {
             // Same tier: cancels a scheduled downgrade, grants nothing.
@@ -88,6 +92,7 @@ class SubscriptionService(
         return SubscriptionDetailsResponse(
             userId = userId,
             currentTier = user.subscriptionTier,
+            managedByStripe = subscription?.stripeSubscriptionId != null,
             pendingTier = subscription?.pendingTier,
             monthlyTokenAllowance = user.subscriptionTier.monthlyTokens,
             allowanceCap = user.subscriptionTier.allowanceCap,
@@ -129,6 +134,72 @@ class SubscriptionService(
             tokenService.renewAllowance(userId, subscription.tier)
             log.info("Renewed {} subscription for user {}", subscription.tier.label, userId)
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Stripe-billed subscriptions. Stripe decides when a plan starts, changes
+    // and ends; these apply what its webhooks report.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Stripe created or changed a subscription (new plan, upgrade, downgrade that
+     * took effect, cancellation scheduled or undone). Upgrades top up the allowance
+     * by the difference, just like [upgradeTier]; the first month's tokens come with
+     * the first paid invoice ([stripeInvoicePaid]).
+     */
+    fun applyStripeSubscription(
+        userId: Long,
+        stripeSubscriptionId: String,
+        tier: SubscriptionTier,
+        periodStart: Instant,
+        periodEnd: Instant,
+        cancelAtPeriodEnd: Boolean,
+    ) {
+        val user = userService.findEntity(userId)
+        val previous = user.subscriptionTier
+
+        val subscription = subscriptionRepository.findByStripeSubscriptionId(stripeSubscriptionId)
+            ?: run {
+                // Replace any subscription from the free test mode.
+                subscriptionRepository.findByUserAndIsActiveTrue(user)?.isActive = false
+                subscriptionRepository.save(Subscription(user = user, stripeSubscriptionId = stripeSubscriptionId))
+            }
+        subscription.tier = tier
+        subscription.isActive = true
+        subscription.billingCycleStart = periodStart
+        subscription.billingCycleEnd = periodEnd
+        subscription.pendingTier = if (cancelAtPeriodEnd) SubscriptionTier.FREE else null
+        userService.updateSubscriptionTier(userId, tier)
+
+        if (previous != SubscriptionTier.FREE && tier > previous) {
+            val topUp = minOf(tier.monthlyTokens - previous.monthlyTokens, tier.allowanceCap - user.allowanceTokens)
+            if (topUp > 0) {
+                tokenService.recordTransaction(
+                    userId = userId,
+                    type = TokenTransactionType.SUBSCRIPTION_GRANT,
+                    amount = topUp,
+                    description = "Upgrade from ${previous.label} to ${tier.label}",
+                )
+            }
+        }
+        log.info("Stripe subscription {} for user {}: {} -> {}", stripeSubscriptionId, userId, previous.label, tier.label)
+    }
+
+    /** A subscription invoice was paid: the first month or a renewal grants the monthly allowance. */
+    fun stripeInvoicePaid(userId: Long, billingReason: String?) {
+        if (billingReason != "subscription_create" && billingReason != "subscription_cycle") return
+        val tier = userService.findEntity(userId).subscriptionTier
+        if (tier != SubscriptionTier.FREE) tokenService.renewAllowance(userId, tier)
+    }
+
+    /** Stripe ended the subscription (cancelled at period end, or unpaid). */
+    fun endStripeSubscription(stripeSubscriptionId: String) {
+        val subscription = subscriptionRepository.findByStripeSubscriptionId(stripeSubscriptionId) ?: return
+        subscription.isActive = false
+        subscription.pendingTier = null
+        val userId = subscription.user!!.id!!
+        userService.updateSubscriptionTier(userId, SubscriptionTier.FREE)
+        log.info("Stripe subscription {} ended; user {} is on Free", stripeSubscriptionId, userId)
     }
 
     /**

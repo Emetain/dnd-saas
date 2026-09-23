@@ -1,82 +1,92 @@
 package com.dndsaas.service
 
+import com.dndsaas.domain.AdSession
 import com.dndsaas.domain.AdView
 import com.dndsaas.domain.TokenTransactionType
+import com.dndsaas.dto.AdTicketResponse
 import com.dndsaas.dto.AdViewResponse
+import com.dndsaas.repository.AdSessionRepository
 import com.dndsaas.repository.AdViewRepository
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.UUID
 
 /**
- * Service for managing ad views and earning tokens from ads.
+ * Service for rewarded ads: watch an ad, earn tokens.
  *
- * Free users can watch ads to earn tokens. This service prevents
- * abuse by tracking which ads have been viewed and limiting rewards.
+ * Each ad is a two-step ticket so tokens cannot be claimed by just calling the
+ * API: [startAd] issues a one-time ticket when the ad opens, and [completeAd]
+ * redeems it once the ad could have finished. Daily and monthly limits apply.
+ *
+ * Note: web ad networks (e.g. Google Ad Manager rewarded ads) report the reward
+ * in the browser only, so a determined user could still script the two calls.
+ * The limits keep that harmless; a network with server-side verification
+ * callbacks would close it completely.
  */
 @Service
 @Transactional
 class AdService(
     private val adViewRepository: AdViewRepository,
+    private val adSessionRepository: AdSessionRepository,
     private val userService: UserService,
     private val tokenService: TokenService,
+    /** Shortest time an ad can take; rewarded video ads are usually 15-30 seconds. */
+    @Value("\${app.ads.min-watch-seconds:10}") private val minWatchSeconds: Long,
 ) {
 
     companion object {
         const val TOKENS_PER_AD_VIEW = 5L
         const val MAX_ADS_PER_DAY = 3 // Keeps free earning well below a paid tier
-        private const val AD_VIEW_COOLDOWN_MINUTES = 60 // Cooldown between same ad views
+
+        /** An unfinished ticket expires after this long. */
+        private const val TICKET_LIFETIME_MINUTES = 30L
     }
 
     /**
-     * Record an ad view and reward tokens.
-     * Returns the tokens awarded, or 0 if the view was rejected.
+     * Step 1: an ad is about to play. Checks the limits up front, so nobody
+     * watches an ad that can no longer pay out, and issues a ticket.
      */
-    fun recordAdView(userId: Long, adId: String, adDetails: String = ""): Long {
+    fun startAd(userId: Long, provider: String): AdTicketResponse {
         val user = userService.findEntity(userId)
-
-        // Check if user has already viewed this ad recently
-        val recentViewCount = adViewRepository.countViewsByUserAndAdId(user, adId)
-        if (recentViewCount > 0) {
-            val lastView = adViewRepository.findAll()
-                .filter { it.user?.id == userId && it.adId == adId }
-                .maxByOrNull { it.createdAt }
-
-            if (lastView != null) {
-                val minutesSinceLastView = ChronoUnit.MINUTES.between(lastView.createdAt, Instant.now())
-                if (minutesSinceLastView < AD_VIEW_COOLDOWN_MINUTES) {
-                    return 0 // Cooldown still active
-                }
-            }
-        }
-
-        // Check daily limit
-        val viewsToday = adViewRepository.countViewsSince(user, Instant.now().minus(1, ChronoUnit.DAYS))
-        if (viewsToday >= MAX_ADS_PER_DAY) {
-            return 0 // Daily limit reached
-        }
-
+        if (getRemainingAdsToday(userId) <= 0) throw AdUnavailableException("Daily ad limit reached. Come back tomorrow!")
         if (tokenService.remainingCappedEarnings(userId) <= 0) {
-            return 0 // Monthly earning cap reached
+            throw AdUnavailableException("Monthly earning limit reached. It resets on the 1st.")
         }
-
-        // Record the view
-        val adView = AdView(
-            user = user,
-            adId = adId,
-            tokensEarned = TOKENS_PER_AD_VIEW,
-            adDetails = adDetails,
+        val session = adSessionRepository.save(
+            AdSession(user = user, provider = provider.take(40).ifBlank { "unknown" }, ticket = UUID.randomUUID().toString()),
         )
-        adViewRepository.save(adView)
+        return AdTicketResponse(ticket = session.ticket, minWatchSeconds = minWatchSeconds, tokensReward = TOKENS_PER_AD_VIEW)
+    }
 
-        // Reward tokens (may be less than a full reward near the monthly cap)
-        return tokenService.rewardTokens(
+    /**
+     * Step 2: the ad network reported the ad as watched. Redeems the ticket
+     * once — and only if enough time has passed for the ad to have played.
+     * Returns the tokens awarded (less than a full reward near the monthly cap).
+     */
+    fun completeAd(userId: Long, ticket: String): Long {
+        val session = adSessionRepository.findByTicket(ticket)
+            ?.takeIf { it.user?.id == userId }
+            ?: throw NoSuchElementException("Unknown ad ticket")
+        if (session.completedAt != null) throw AdUnavailableException("This ad has already been rewarded")
+
+        val age = Duration.between(session.createdAt, Instant.now())
+        if (age.toMinutes() >= TICKET_LIFETIME_MINUTES) throw AdUnavailableException("This ad expired — please watch a new one")
+        if (age.seconds < minWatchSeconds) throw AdUnavailableException("The ad has not finished yet")
+        if (getRemainingAdsToday(userId) <= 0) throw AdUnavailableException("Daily ad limit reached. Come back tomorrow!")
+
+        session.completedAt = Instant.now()
+        val awarded = tokenService.rewardTokens(
             userId = userId,
             type = TokenTransactionType.AD_VIEW_REWARD,
             amount = TOKENS_PER_AD_VIEW,
-            description = "Watched ad: $adId",
+            description = "Watched an ad (${session.provider})",
         )
+        adViewRepository.save(AdView(user = session.user, adId = session.provider, tokensEarned = awarded, adDetails = ticket))
+        return awarded
     }
 
     /**
@@ -116,3 +126,6 @@ class AdService(
         )
 }
 
+
+/** The ad cannot be started or rewarded right now (limits, reused or unfinished ticket). */
+class AdUnavailableException(message: String) : RuntimeException(message)

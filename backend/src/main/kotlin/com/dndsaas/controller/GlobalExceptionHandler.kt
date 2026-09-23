@@ -1,5 +1,9 @@
 package com.dndsaas.controller
 
+import com.dndsaas.service.AdUnavailableException
+import com.dndsaas.service.AlreadySubscribedException
+import com.dndsaas.service.InvalidWebhookException
+import com.dndsaas.service.PaymentsDisabledException
 import com.dndsaas.service.AiValidationException
 import com.dndsaas.service.InsufficientTokensException
 import com.dndsaas.service.TierRestrictionException
@@ -55,6 +59,26 @@ class GlobalExceptionHandler {
         ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(
             mapOf("error" to ex.message, "required" to ex.required, "available" to ex.available),
         )
+
+    /** A rewarded ad cannot start or pay out right now (limits, reused or unfinished ticket). */
+    @ExceptionHandler(AdUnavailableException::class)
+    fun handleAdUnavailable(ex: AdUnavailableException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("error" to ex.message))
+
+    /** Payments are not set up yet (no STRIPE_SECRET_KEY). */
+    @ExceptionHandler(PaymentsDisabledException::class)
+    fun handlePaymentsDisabled(ex: PaymentsDisabledException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(mapOf("error" to ex.message))
+
+    /** A second subscription, nothing to manage yet, or a free change while real payments are on. */
+    @ExceptionHandler(AlreadySubscribedException::class)
+    fun handleAlreadySubscribed(ex: AlreadySubscribedException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("error" to ex.message))
+
+    /** A webhook call that was not signed by Stripe. */
+    @ExceptionHandler(InvalidWebhookException::class)
+    fun handleInvalidWebhook(ex: InvalidWebhookException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to ex.message))
 
     /** The user's subscription tier does not include this feature. */
     @ExceptionHandler(TierRestrictionException::class)

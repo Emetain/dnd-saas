@@ -13,7 +13,10 @@ interface SubscriptionRepository : JpaRepository<Subscription, Long> {
     @Query("SELECT s FROM Subscription s WHERE s.user = ?1 AND s.isActive = true AND s.tier = ?2")
     fun findActiveByUserAndTier(user: User, tier: SubscriptionTier): Subscription?
     
-    @Query("SELECT s FROM Subscription s WHERE s.billingCycleEnd < ?1 AND s.isActive = true")
+    /** Cycles our own scheduler renews; Stripe-billed subscriptions are renewed by Stripe's invoices. */
+    @Query("SELECT s FROM Subscription s WHERE s.billingCycleEnd < ?1 AND s.isActive = true AND s.stripeSubscriptionId IS NULL")
     fun findExpiredBillingCycles(now: Instant): List<Subscription>
+
+    fun findByStripeSubscriptionId(stripeSubscriptionId: String): Subscription?
 }
 

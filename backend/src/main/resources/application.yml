@@ -28,4 +28,9 @@ app:
     base-url: https://api.openai.com/v1
     model: gpt-4o-mini
     timeout-seconds: 60
+  # Payments. Without STRIPE_SECRET_KEY, payments are off and plan changes are free (testing).
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY:}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+    return-base-url: ${APP_BASE_URL:http://localhost:5173}
 

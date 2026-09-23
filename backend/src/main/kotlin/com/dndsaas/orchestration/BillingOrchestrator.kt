@@ -1,7 +1,9 @@
 package com.dndsaas.orchestration
 
+import com.dndsaas.config.StripeProperties
 import com.dndsaas.domain.SubscriptionTier
 import com.dndsaas.domain.TokenPack
+import com.dndsaas.dto.AdTicketResponse
 import com.dndsaas.dto.EarningOpportunitiesResponse
 import com.dndsaas.dto.LoginStreakResponse
 import com.dndsaas.dto.ReferralResponse
@@ -10,6 +12,7 @@ import com.dndsaas.dto.TokenBalanceResponse
 import com.dndsaas.dto.TokenEarnedResponse
 import com.dndsaas.dto.UserResponse
 import com.dndsaas.dto.UserRegistrationRequest
+import com.dndsaas.service.AlreadySubscribedException
 import com.dndsaas.service.AppReviewService
 import com.dndsaas.service.FreeTierEarningService
 import com.dndsaas.service.LoginStreakService
@@ -35,7 +38,15 @@ class BillingOrchestrator(
     private val loginStreakService: LoginStreakService,
     private val appReviewService: AppReviewService,
     private val adService: com.dndsaas.service.AdService,
+    private val stripeProperties: StripeProperties,
 ) {
+
+    /** Free plan changes and pack purchases exist for testing only; with Stripe on, money goes through checkout. */
+    private fun requireTestMode() {
+        if (stripeProperties.isConfigured) {
+            throw AlreadySubscribedException("Plans and token packs are bought through checkout")
+        }
+    }
 
     // -------- User Registration & Account --------
 
@@ -54,6 +65,7 @@ class BillingOrchestrator(
         tokenService.getTransactionHistory(userId, limit)
 
     fun purchaseTokens(userId: Long, pack: TokenPack): TokenBalanceResponse {
+        requireTestMode()
         tokenService.purchaseTokens(userId, pack)
         return tokenService.getBalanceDetails(userId)
     }
@@ -61,6 +73,7 @@ class BillingOrchestrator(
     // -------- Subscription Management --------
 
     fun upgradeSubscription(userId: Long, newTier: SubscriptionTier) {
+        requireTestMode()
         subscriptionService.upgradeTier(userId, newTier)
     }
 
@@ -68,6 +81,7 @@ class BillingOrchestrator(
         subscriptionService.getSubscriptionDetails(userId)
 
     fun downgradeToFree(userId: Long) {
+        requireTestMode()
         subscriptionService.downgradeToFree(userId)
     }
 
@@ -81,8 +95,10 @@ class BillingOrchestrator(
 
     // -------- Ad Watching --------
 
-    fun watchAd(userId: Long, adId: String, adDetails: String = ""): TokenEarnedResponse {
-        val tokensEarned = adService.recordAdView(userId, adId, adDetails)
+    fun startAd(userId: Long, provider: String): AdTicketResponse = adService.startAd(userId, provider)
+
+    fun completeAd(userId: Long, ticket: String): TokenEarnedResponse {
+        val tokensEarned = adService.completeAd(userId, ticket)
 
         return TokenEarnedResponse(
             tokensEarned = tokensEarned,

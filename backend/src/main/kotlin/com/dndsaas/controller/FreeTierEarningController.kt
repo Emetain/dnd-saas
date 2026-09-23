@@ -1,5 +1,6 @@
 package com.dndsaas.controller
 
+import com.dndsaas.dto.AdTicketResponse
 import com.dndsaas.dto.EarningOpportunitiesResponse
 import com.dndsaas.dto.LoginStreakResponse
 import com.dndsaas.dto.ReferralResponse
@@ -50,18 +51,27 @@ class FreeTierEarningController(
 
     // -------- Ad Watching --------
 
-    @PostMapping("/ads/watch")
+    @PostMapping("/ads/start")
     @Operation(
-        summary = "Record an ad view and claim reward",
+        summary = "Start a rewarded ad",
+        description = "Checks the daily and monthly limits and returns a one-time ticket. 409 if no ad can pay out now.",
     )
-    fun watchAd(
+    fun startAd(
         @PathVariable userId: Long,
-        @RequestBody request: WatchAdRequest,
-    ): ResponseEntity<TokenEarnedResponse> {
-        val result = billingOrchestrator.watchAd(userId, request.adId, request.adDetails ?: "")
-        return ResponseEntity.status(if (result.tokensEarned > 0) HttpStatus.OK else HttpStatus.CONFLICT)
-            .body(result)
-    }
+        @RequestBody request: StartAdRequest,
+    ): AdTicketResponse =
+        billingOrchestrator.startAd(userId, request.provider)
+
+    @PostMapping("/ads/complete")
+    @Operation(
+        summary = "Claim the reward for a watched ad",
+        description = "Redeems the ticket from /ads/start — once, and only after the ad could have finished.",
+    )
+    fun completeAd(
+        @PathVariable userId: Long,
+        @RequestBody request: CompleteAdRequest,
+    ): TokenEarnedResponse =
+        billingOrchestrator.completeAd(userId, request.ticket)
 
     // -------- Referral Program --------
 
@@ -130,9 +140,13 @@ class FreeTierEarningController(
 
 // -------- Request DTOs --------
 
-data class WatchAdRequest(
-    val adId: String,
-    val adDetails: String? = null,
+data class StartAdRequest(
+    /** Which ad provider will show the ad, e.g. "google" or "simulated". */
+    val provider: String = "unknown",
+)
+
+data class CompleteAdRequest(
+    val ticket: String,
 )
 
 data class ApplyReferralRequest(

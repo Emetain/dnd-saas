@@ -57,6 +57,14 @@ export const tokenApi = {
   purchase: (userId, pack) => post(`/users/${userId}/tokens/purchase`, { pack }),
 }
 
+/** Real payments through Stripe (when the backend has a Stripe key). */
+export const paymentApi = {
+  config: () => request('/billing/config'),
+  /** Returns { url } — send the browser there. Pass { tier } or { pack }. */
+  checkout: (userId, body) => post(`/users/${userId}/billing/checkout`, body),
+  portal: (userId) => post(`/users/${userId}/billing/portal`),
+}
+
 export const subscriptionApi = {
   get: (userId) => request(`/users/${userId}/subscription`),
   change: (userId, tier) => post(`/users/${userId}/subscription/upgrade`, { tier }),
@@ -65,7 +73,9 @@ export const subscriptionApi = {
 
 export const earnApi = {
   opportunities: (userId) => request(`/users/${userId}/earn`),
-  watchAd: (userId, adId) => post(`/users/${userId}/earn/ads/watch`, { adId, adDetails: 'Web app' }),
+  /** Rewarded ads: get a one-time ticket, then redeem it once the ad was watched. */
+  startAd: (userId, provider) => post(`/users/${userId}/earn/ads/start`, { provider }),
+  completeAd: (userId, ticket) => post(`/users/${userId}/earn/ads/complete`, { ticket }),
   recordLogin: (userId) => post(`/users/${userId}/earn/login`),
   referral: (userId) => request(`/users/${userId}/earn/referral`),
   applyReferral: (userId, referralCode) => post(`/users/${userId}/earn/referral/apply`, { referralCode }),

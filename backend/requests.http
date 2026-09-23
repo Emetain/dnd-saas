@@ -860,38 +860,39 @@ Accept: application/json
 GET http://localhost:8080/api/v1/users/{{dmId}}/earn
 Accept: application/json
 
-### 76. Watch an ad and earn tokens
-###     Expect 5 tokens earned. Status 200 if successful, 409 if daily limit reached
-POST http://localhost:8080/api/v1/users/{{dmId}}/earn/ads/watch
+### 76. Start a rewarded ad — returns a one-time ticket (saved as {{adTicket}})
+###     409 if the daily limit (3) or the monthly earning cap is reached
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/ads/start
 Content-Type: application/json
 
 {
-  "adId": "google_admob_campaign_001",
-  "adDetails": "Game offer from AdNetwork"
+  "provider": "simulated"
 }
 
-### 77. Watch another ad
-POST http://localhost:8080/api/v1/users/{{dmId}}/earn/ads/watch
+> {% client.global.set("adTicket", response.body.ticket); %}
+
+### 77. Claim the reward — run this at least 10 seconds after #76 (the ad's minimum length)
+###     Expect +5 tokens. Running it too early gives 409 "The ad has not finished yet".
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/ads/complete
 Content-Type: application/json
 
 {
-  "adId": "google_admob_campaign_002",
-  "adDetails": "Learning app offer"
+  "ticket": "{{adTicket}}"
 }
 
-### 78. Check balance after ads (should be 60 tokens now: 50 + 5 + 5)
+### 78. Check balance after the ad (should be 55 tokens now: 50 + 5)
 GET http://localhost:8080/api/v1/users/{{dmId}}/tokens
 Accept: application/json
 
-### 79. Try to watch the same ad twice immediately (should fail — cooldown enforced)
-###     Expect 409 Conflict — cooldown still active
-POST http://localhost:8080/api/v1/users/{{dmId}}/earn/ads/watch
+### 79. ERROR: claim the same ad twice
+###     Expect 409 Conflict — "This ad has already been rewarded"
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/ads/complete
 Content-Type: application/json
 
 {
-  "adId": "google_admob_campaign_001",
-  "adDetails": "Game offer from AdNetwork"
+  "ticket": "{{adTicket}}"
 }
+
 
 
 ### --- FREE TIER EARNING: LOGIN STREAKS ---
@@ -910,7 +911,7 @@ Accept: application/json
 POST http://localhost:8080/api/v1/users/{{dmId}}/earn/login
 Accept: application/json
 
-### 83. Check balance (should still be 61 tokens: 60 + 1 from login)
+### 83. Check balance (should now be 56 tokens: 55 + 1 from login)
 GET http://localhost:8080/api/v1/users/{{dmId}}/tokens
 Accept: application/json
 
@@ -979,7 +980,7 @@ Content-Type: application/json
   "reviewContent": "Best campaign planner for D&D."
 }
 
-### 91. Check balance after reviews (should be 61 + 25 + 25 = 111 tokens)
+### 91. Check balance after reviews (should be 56 + 25 + 25 = 106 tokens)
 GET http://localhost:8080/api/v1/users/{{dmId}}/tokens
 Accept: application/json
 
@@ -1010,7 +1011,7 @@ Content-Type: application/json
 }
 
 ### 94. Upgrade to Pro
-###     Expect +1,000 allowance and a new 1-month billing cycle (111 -> 1,111)
+###     Expect +1,000 allowance and a new 1-month billing cycle (106 -> 1,106)
 POST http://localhost:8080/api/v1/users/{{dmId}}/subscription/upgrade
 Content-Type: application/json
 
@@ -1028,7 +1029,7 @@ Content-Type: application/json
   "pack": "MEDIUM"
 }
 
-### 96. Check the buckets: allowanceTokens = 1,111, purchasedTokens = 1,000, allowanceCap = 2,000
+### 96. Check the buckets: allowanceTokens = 1,106, purchasedTokens = 1,000, allowanceCap = 2,000
 GET http://localhost:8080/api/v1/users/{{dmId}}/tokens
 Accept: application/json
 
@@ -1064,7 +1065,7 @@ Content-Type: application/json
 
 ### 101. Get total tokens earned from all free sources
 ###      Should show sum of ad views, referrals, login streaks, app reviews
-###      (10 from ads + 1 login + 50 reviews = 61 — subscription grants are not "earned")
+###      (5 from the ad + 1 login + 50 reviews = 56 — subscription grants are not "earned")
 GET http://localhost:8080/api/v1/users/{{dmId}}/earn/total
 Accept: application/json
 

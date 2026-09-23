@@ -8,11 +8,13 @@ package com.dndsaas.domain
 enum class SubscriptionTier(
     val label: String,
     val monthlyTokens: Long,
+    /** Monthly price in euro cents. */
+    val priceEuroCents: Int = 0,
 ) {
     FREE("Free", monthlyTokens = 50), // Starter tokens, can earn more
-    PRO("Pro", monthlyTokens = 1_000),
-    PRO_PLUS("Pro+", monthlyTokens = 3_000),
-    ULTIMATE_DM("Ultimate DM", monthlyTokens = 5_000),
+    PRO("Pro", monthlyTokens = 1_000, priceEuroCents = 1_000),
+    PRO_PLUS("Pro+", monthlyTokens = 3_000, priceEuroCents = 2_500),
+    ULTIMATE_DM("Ultimate DM", monthlyTokens = 5_000, priceEuroCents = 5_000),
     ;
 
     /**
@@ -23,13 +25,13 @@ enum class SubscriptionTier(
 }
 
 /**
- * Token packs that can be bought on top of a subscription.
- * Placeholder sizes until pricing is decided; purchased tokens never expire.
+ * Token packs that can be bought on top of a subscription; purchased tokens never expire.
+ * Packs cost more per token than a subscription, so subscribing stays the better deal.
  */
-enum class TokenPack(val tokens: Long) {
-    SMALL(250),
-    MEDIUM(1_000),
-    LARGE(2_500),
+enum class TokenPack(val tokens: Long, val priceEuroCents: Int) {
+    SMALL(250, priceEuroCents = 500),      // €5  — €0.020 per token
+    MEDIUM(1_000, priceEuroCents = 1_500), // €15 — €0.015 per token
+    LARGE(2_500, priceEuroCents = 2_500),  // €25 — €0.010 per token
 }
 
 /**

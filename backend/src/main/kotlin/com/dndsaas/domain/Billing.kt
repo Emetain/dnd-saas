@@ -41,6 +41,22 @@ class Subscription(
      */
     @Enumerated(EnumType.STRING)
     var pendingTier: SubscriptionTier? = null,
+
+    /** Set when Stripe bills this subscription; Stripe then drives renewals and tier changes. */
+    var stripeSubscriptionId: String? = null,
+) : BaseEntity()
+
+/**
+ * A Stripe webhook event that has been handled. Stripe can deliver the same
+ * event more than once; this makes sure tokens are only granted once.
+ */
+@Entity
+@Table(name = "stripe_events")
+class StripeEvent(
+    @Column(unique = true, nullable = false)
+    var eventId: String = "",
+
+    var type: String = "",
 ) : BaseEntity()
 
 /**

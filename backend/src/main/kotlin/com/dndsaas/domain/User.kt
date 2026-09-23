@@ -39,6 +39,9 @@ class User(
     @Column(name = "platform_tokens")
     var allowanceTokens: Long = 50, // Free users start with 50 tokens
 
+    /** The user's customer id at Stripe, created on their first checkout. */
+    var stripeCustomerId: String? = null,
+
     /** Bought tokens. Never reset or capped, and spent only once the allowance runs out. */
     @ColumnDefault("0")
     var purchasedTokens: Long = 0,
