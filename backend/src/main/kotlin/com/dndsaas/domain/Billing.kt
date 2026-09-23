@@ -33,6 +33,14 @@ class Subscription(
 
     /** Whether this subscription is currently active. */
     var isActive: Boolean = true,
+
+    /**
+     * A downgrade waiting for the end of the billing cycle. The user keeps the
+     * tier they paid for until then — which also stops tokens being farmed by
+     * downgrading and re-upgrading.
+     */
+    @Enumerated(EnumType.STRING)
+    var pendingTier: SubscriptionTier? = null,
 ) : BaseEntity()
 
 /**

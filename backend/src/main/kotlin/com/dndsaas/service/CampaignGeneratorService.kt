@@ -1,9 +1,11 @@
 package com.dndsaas.service
 
 import com.dndsaas.domain.Campaign
+import com.dndsaas.domain.CampaignKind
 import com.dndsaas.domain.GenerationType
 import com.dndsaas.domain.LocationType
 import com.dndsaas.domain.QuestStatus
+import com.dndsaas.domain.User
 import com.dndsaas.dto.CampaignBlueprint
 import com.dndsaas.dto.CampaignGenerationRequest
 import com.dndsaas.dto.CampaignGenerationResult
@@ -85,9 +87,12 @@ class CampaignGeneratorService(
         - Never ask more questions than requested.
     """.trimIndent()
 
-    fun interview(request: CampaignInterviewRequest): CampaignInterviewResponse {
+    fun interview(request: CampaignInterviewRequest, user: User): CampaignInterviewResponse {
         val instruction = buildString {
-            appendLine("The Dungeon Master wants to build a new campaign.")
+            appendLine(
+                if (request.oneShot) "The Dungeon Master wants to build a one-shot for a single sitting."
+                else "The Dungeon Master wants to build a new campaign.",
+            )
             appendLine()
             appendLine("Their idea: ${request.idea.ifBlank { "(they have not said yet — ask broadly)" }}")
             appendLine("Game system: ${request.system}")
@@ -103,7 +108,7 @@ class CampaignGeneratorService(
         val response = aiService.generate(
             campaign = null,
             request = GenerationRequest(
-                type = GenerationType.CAMPAIGN,
+                type = if (request.oneShot) GenerationType.ONE_SHOT else GenerationType.CAMPAIGN,
                 instruction = instruction,
                 temperature = 0.7,
                 mock = request.mock,
@@ -111,6 +116,9 @@ class CampaignGeneratorService(
             jsonSchema = interviewSchema,
             requiredFields = listOf("questions"),
             systemGuidance = interviewGuidance,
+            user = user,
+            // Free: the interview is part of creating a campaign, which /generate charges for.
+            tokenCost = 0,
         )
 
         val parsed = objectMapper.treeToValue(response.content, CampaignInterviewResponse::class.java)
@@ -219,8 +227,8 @@ class CampaignGeneratorService(
     """.trimIndent()
 
     @Transactional
-    fun generate(request: CampaignGenerationRequest): CampaignGenerationResult =
-        generateInternal(request, GenerationType.CAMPAIGN, oneShot = false)
+    fun generate(request: CampaignGenerationRequest, user: User): CampaignGenerationResult =
+        generateInternal(request, user, GenerationType.CAMPAIGN, oneShot = false)
 
     /**
      * Generates a self-contained one-shot: a small, fully connected world sized
@@ -230,7 +238,7 @@ class CampaignGeneratorService(
      * one-shot is simply a campaign with tighter scope and a resolution.
      */
     @Transactional
-    fun generateOneShot(request: CampaignGenerationRequest): CampaignGenerationResult =
+    fun generateOneShot(request: CampaignGenerationRequest, user: User): CampaignGenerationResult =
         generateInternal(
             request.copy(
                 locationCount = request.locationCount.coerceAtMost(3),
@@ -247,12 +255,14 @@ class CampaignGeneratorService(
                     )
                 },
             ),
+            user,
             GenerationType.ONE_SHOT,
             oneShot = true,
         )
 
     private fun generateInternal(
         request: CampaignGenerationRequest,
+        user: User,
         generationType: GenerationType,
         oneShot: Boolean,
     ): CampaignGenerationResult {
@@ -301,10 +311,11 @@ class CampaignGeneratorService(
             jsonSchema = blueprintSchema(request),
             requiredFields = listOf("name", "worldLore"),
             systemGuidance = if (oneShot) "$blueprintGuidance\n\n$oneShotGuidance" else blueprintGuidance,
+            user = user,
         )
 
         val blueprint = objectMapper.treeToValue(response.content, CampaignBlueprint::class.java)
-        val result = persist(blueprint, request)
+        val result = persist(blueprint, request, user, if (oneShot) CampaignKind.ONE_SHOT else CampaignKind.CAMPAIGN)
 
         return CampaignGenerationResult(
             campaign = result.campaign,
@@ -329,7 +340,12 @@ class CampaignGeneratorService(
         val session: com.dndsaas.dto.SessionResponse,
     )
 
-    private fun persist(blueprint: CampaignBlueprint, request: CampaignGenerationRequest): PersistResult {
+    private fun persist(
+        blueprint: CampaignBlueprint,
+        request: CampaignGenerationRequest,
+        owner: User,
+        kind: CampaignKind,
+    ): PersistResult {
         // --- The campaign itself ---
         val campaignResponse = campaignService.create(
             CampaignRequest(
@@ -337,7 +353,9 @@ class CampaignGeneratorService(
                 description = blueprint.premise,
                 system = request.system,
                 worldLore = blueprint.worldLore,
+                kind = kind,
             ),
+            owner,
         )
         val campaign: Campaign = campaignService.findEntity(campaignResponse.id)
 

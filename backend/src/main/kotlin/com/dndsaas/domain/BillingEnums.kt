@@ -13,6 +13,23 @@ enum class SubscriptionTier(
     PRO("Pro", monthlyTokens = 1_000),
     PRO_PLUS("Pro+", monthlyTokens = 3_000),
     ULTIMATE_DM("Ultimate DM", monthlyTokens = 5_000),
+    ;
+
+    /**
+     * Unused allowance rolls over, but never beyond two months' worth.
+     * Purchased tokens are separate and not limited by this cap.
+     */
+    val allowanceCap: Long get() = monthlyTokens * 2
+}
+
+/**
+ * Token packs that can be bought on top of a subscription.
+ * Placeholder sizes until pricing is decided; purchased tokens never expire.
+ */
+enum class TokenPack(val tokens: Long) {
+    SMALL(250),
+    MEDIUM(1_000),
+    LARGE(2_500),
 }
 
 /**
@@ -27,6 +44,8 @@ enum class TokenTransactionType {
     LOGIN_STREAK_REWARD,     // Earned from maintaining login streak
     APP_REVIEW_REWARD,       // Earned from leaving app review
     MANUAL_REFUND,           // Admin refund/adjustment
+    TOKEN_PURCHASE,          // Bought a token pack (never expires)
+    ALLOWANCE_EXPIRED,       // Allowance above the rollover cap removed at renewal
 }
 
 /**

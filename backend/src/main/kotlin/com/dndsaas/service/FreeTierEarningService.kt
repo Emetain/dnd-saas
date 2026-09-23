@@ -20,45 +20,51 @@ class FreeTierEarningService(
     private val referralService: ReferralService,
     private val loginStreakService: LoginStreakService,
     private val appReviewService: AppReviewService,
+    private val tokenService: TokenService,
 ) {
 
     /**
-     * Get all available earning opportunities for a free user.
+     * Get all available earning opportunities. Every tier can earn; paid users
+     * simply rarely need to.
      */
     fun getEarningOpportunities(userId: Long): EarningOpportunitiesResponse {
         val user = userService.findEntity(userId)
         val opportunities = mutableListOf<FreeTierEarningOpportunity>()
 
-        // Only show opportunities if user is on free tier
-        if (user.subscriptionTier == SubscriptionTier.FREE) {
-            opportunities.add(buildAdOpportunity(userId))
-            opportunities.add(buildReferralOpportunity(userId))
-            opportunities.add(buildLoginStreakOpportunity(userId))
-            opportunities.add(buildAppReviewOpportunity(userId))
-            opportunities.add(buildSocialShareOpportunity())
-        }
+        opportunities.add(buildAdOpportunity(userId))
+        opportunities.add(buildReferralOpportunity(userId))
+        opportunities.add(buildLoginStreakOpportunity(userId))
+        opportunities.add(buildAppReviewOpportunity(userId))
+        opportunities.add(buildSocialShareOpportunity())
 
         return EarningOpportunitiesResponse(
             userId = userId,
-            currentTokens = user.platformTokens,
+            currentTokens = user.totalTokens,
             opportunities = opportunities,
         )
     }
 
     private fun buildAdOpportunity(userId: Long): FreeTierEarningOpportunity {
         val remainingToday = adService.getRemainingAdsToday(userId)
-        val isAvailable = remainingToday > 0
+        val remainingThisMonth = tokenService.remainingCappedEarnings(userId)
+        val isAvailable = remainingToday > 0 && remainingThisMonth > 0
 
         return FreeTierEarningOpportunity(
             type = "ad",
             title = "Watch Ads",
             description = "Watch short ads to earn tokens. No strings attached.",
-            tokensReward = 5,
+            tokensReward = AdService.TOKENS_PER_AD_VIEW,
             isAvailable = isAvailable,
-            reason = if (!isAvailable) "Daily limit reached. Come back tomorrow!" else null,
+            reason = when {
+                remainingThisMonth <= 0 -> "Monthly earning limit reached. It resets on the 1st."
+                remainingToday <= 0 -> "Daily limit reached. Come back tomorrow!"
+                else -> null
+            },
             metadata = mapOf(
                 "remaining_today" to remainingToday,
-                "max_per_day" to 10,
+                "max_per_day" to AdService.MAX_ADS_PER_DAY,
+                "monthly_cap" to TokenService.MONTHLY_EARNING_CAP,
+                "remaining_this_month" to remainingThisMonth,
                 "total_earned" to adService.getTotalTokensEarnedFromAds(userId),
             ) as Map<String, Any>?,
         )
@@ -137,8 +143,8 @@ class FreeTierEarningService(
             title = "Share on Social Media",
             description = "Share the app with your gaming community on Twitter, Reddit, or Discord. Limited daily.",
             tokensReward = 10,
-            isAvailable = true,
-            reason = null,
+            isAvailable = false,
+            reason = "Coming soon",
             metadata = mapOf(
                 "platforms" to listOf("twitter", "reddit", "discord"),
                 "daily_limit" to 2,
@@ -165,8 +171,8 @@ class FreeTierEarningService(
      * Useful for marketing material and onboarding copy.
      */
     fun getFreeTierPotentialEarnings(): Map<String, Long> = mapOf(
-        "ads_daily" to (5 * 10), // 5 tokens × 10 ads max per day
-        "ads_monthly" to (5 * 10 * 30),
+        "ads_daily" to AdService.TOKENS_PER_AD_VIEW * AdService.MAX_ADS_PER_DAY,
+        "ads_and_login_monthly_cap" to TokenService.MONTHLY_EARNING_CAP,
         "referrals_per_friend" to 50,
         "login_streak_daily" to 1,
         "login_streak_weekly_bonus" to 25,

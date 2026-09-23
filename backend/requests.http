@@ -1,4 +1,29 @@
 ### =====================================================================
+### SETUP — every campaign belongs to a user, and generations cost that
+###         user's tokens. Run #0 and #0b first; the id is saved as {{ownerId}}.
+### =====================================================================
+
+### 0. Register the account that owns the campaigns below
+POST http://localhost:8080/api/v1/users/register
+Content-Type: application/json
+
+{
+  "email": "owner@example.com",
+  "displayName": "Campaign Owner",
+  "password": "owner_password_123"
+}
+
+> {% client.global.set("ownerId", response.body.id); %}
+
+### 0b. Upgrade the owner to Ultimate DM so the generator tests below have enough tokens
+POST http://localhost:8080/api/v1/users/{{ownerId}}/subscription/upgrade
+Content-Type: application/json
+
+{
+  "tier": "ULTIMATE_DM"
+}
+
+### =====================================================================
 ### CAMPAIGNS  — proves CampaignController -> CampaignOrchestrator
 ###              -> CampaignService -> CampaignRepository
 ### =====================================================================
@@ -9,6 +34,7 @@ Accept: application/json
 
 ### 2. Create a campaign  (expect 201 Created + a JSON body with "id": 1)
 POST http://localhost:8080/api/v1/campaigns
+X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -23,11 +49,11 @@ GET http://localhost:8080/api/v1/campaigns
 Accept: application/json
 
 ### 4. Get a single campaign by id
-GET http://localhost:8080/api/v1/campaigns/2
+GET http://localhost:8080/api/v1/campaigns/1
 Accept: application/json
 
 ### 5. Update the campaign (expect the new name in the response)
-PUT http://localhost:8080/api/v1/campaigns/2
+PUT http://localhost:8080/api/v1/campaigns/1
 Content-Type: application/json
 
 {
@@ -49,7 +75,7 @@ Accept: application/json
 ### =====================================================================
 
 ### 7. Add a session to campaign 1 (expect 201)
-POST http://localhost:8080/api/v1/campaigns/2/sessions
+POST http://localhost:8080/api/v1/campaigns/1/sessions
 Content-Type: application/json
 
 {
@@ -61,7 +87,7 @@ Content-Type: application/json
 }
 
 ### 8. Add a second session
-POST http://localhost:8080/api/v1/campaigns/2/sessions
+POST http://localhost:8080/api/v1/campaigns/1/sessions
 Content-Type: application/json
 
 {
@@ -73,7 +99,7 @@ Content-Type: application/json
 }
 
 ### 9. List sessions for campaign 1 (should return both, ordered by sessionNumber)
-GET http://localhost:8080/api/v1/campaigns/2/sessions
+GET http://localhost:8080/api/v1/campaigns/1/sessions
 Accept: application/json
 
 ### 10. Get one session directly
@@ -539,7 +565,7 @@ Content-Type: application/json
 ### 53. Generate an NPC that fits the existing world.
 ###     The reply should reference Barovia, the cult or the Kolyana family
 ###     WITHOUT you mentioning them — that is Campaign Memory at work.
-POST http://localhost:8080/api/v1/campaigns/2/ai/generate
+POST http://localhost:8080/api/v1/campaigns/1/ai/generate
 Content-Type: application/json
 
 {
@@ -610,6 +636,7 @@ Accept: application/json
 ### 60. STEP 1 (free): give a rough idea, get questions back.
 ###     Nothing is saved yet — this is just the interview.
 POST http://localhost:8080/api/v1/ai/campaign-generator/interview
+X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -629,6 +656,7 @@ Content-Type: application/json
 ###     look at the campaign in the database — the locations, factions,
 ###     NPCs and quests are all REAL ROWS, already linked to each other.
 POST http://localhost:8080/api/v1/ai/campaign-generator/generate
+X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -663,18 +691,20 @@ Content-Type: application/json
   "mock": true
 }
 
-### 62. Confirm it was really saved. Use the campaign id returned by #61.
-GET http://localhost:8080/api/v1/campaigns/2/memory/stats
+> {% client.global.set("generatedCampaignId", response.body.campaign.id); %}
+
+### 62. Confirm it was really saved (uses the campaign id saved from #61).
+GET http://localhost:8080/api/v1/campaigns/{{generatedCampaignId}}/memory/stats
 Accept: application/json
 
 ### 63. The generated world, fully connected (NPCs linked to locations/factions,
 ###     quests linked to givers and NPCs).
-GET http://localhost:8080/api/v1/campaigns/2/memory
+GET http://localhost:8080/api/v1/campaigns/{{generatedCampaignId}}/memory
 Accept: application/json
 
 ### 64. The generated Session 1 plan, stored as a real session.
 ###     Its "notes" contain the opening scene, beats, encounters and cliffhanger.
-GET http://localhost:8080/api/v1/campaigns/2/sessions
+GET http://localhost:8080/api/v1/campaigns/{{generatedCampaignId}}/sessions
 Accept: application/json
 
 
@@ -682,6 +712,7 @@ Accept: application/json
 
 ### 65. STEP 1 for real: the AI interviews you about your idea.
 POST http://localhost:8080/api/v1/ai/campaign-generator/interview
+X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -702,6 +733,7 @@ Content-Type: application/json
 ###     pulled in by an accidental discovery, and an ending built around
 ###     choosing which truth survives.
 POST http://localhost:8080/api/v1/ai/campaign-generator/generate
+X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -756,6 +788,7 @@ Content-Type: application/json
 ### 67. Generating without doing the interview also works — the answers
 ###     array is simply optional.
 POST http://localhost:8080/api/v1/ai/campaign-generator/generate
+X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -779,7 +812,7 @@ Content-Type: application/json
 
 ### 70. Register a new user account
 ###     Expect 201 Created. User should have 50 starting tokens.
-POST http://localhost:8080/v1/users/register
+POST http://localhost:8080/api/v1/users/register
 Content-Type: application/json
 
 {
@@ -788,13 +821,15 @@ Content-Type: application/json
   "password": "secure_password_123"
 }
 
+> {% client.global.set("dmId", response.body.id); %}
+
 ### 71. Get user account info
 ###     Should show subscriptionTier = FREE, platformTokens = 50
-GET http://localhost:8080/v1/users/1
+GET http://localhost:8080/api/v1/users/{{dmId}}
 Accept: application/json
 
 ### 72. Register another user (for referral tests later)
-POST http://localhost:8080/v1/users/register
+POST http://localhost:8080/api/v1/users/register
 Content-Type: application/json
 
 {
@@ -803,16 +838,18 @@ Content-Type: application/json
   "password": "player_password_123"
 }
 
+> {% client.global.set("playerId", response.body.id); %}
+
 
 ### --- TOKEN MANAGEMENT ---
 
 ### 73. Check token balance for user 1
 ###     Should show currentTokens = 50, monthlyAllowance = 50 (FREE tier)
-GET http://localhost:8080/v1/users/1/tokens
+GET http://localhost:8080/api/v1/users/{{dmId}}/tokens
 Accept: application/json
 
 ### 74. Get token transaction history (should be empty on fresh account)
-GET http://localhost:8080/v1/users/1/tokens/history
+GET http://localhost:8080/api/v1/users/{{dmId}}/tokens/history
 Accept: application/json
 
 
@@ -820,12 +857,12 @@ Accept: application/json
 
 ### 75. Get all earning opportunities for user 1
 ###     Should show ads available, referral code, login streak, app reviews
-GET http://localhost:8080/v1/users/1/earn
+GET http://localhost:8080/api/v1/users/{{dmId}}/earn
 Accept: application/json
 
 ### 76. Watch an ad and earn tokens
 ###     Expect 5 tokens earned. Status 200 if successful, 409 if daily limit reached
-POST http://localhost:8080/v1/users/1/earn/ads/watch
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/ads/watch
 Content-Type: application/json
 
 {
@@ -834,7 +871,7 @@ Content-Type: application/json
 }
 
 ### 77. Watch another ad
-POST http://localhost:8080/v1/users/1/earn/ads/watch
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/ads/watch
 Content-Type: application/json
 
 {
@@ -843,12 +880,12 @@ Content-Type: application/json
 }
 
 ### 78. Check balance after ads (should be 60 tokens now: 50 + 5 + 5)
-GET http://localhost:8080/v1/users/1/tokens
+GET http://localhost:8080/api/v1/users/{{dmId}}/tokens
 Accept: application/json
 
 ### 79. Try to watch the same ad twice immediately (should fail — cooldown enforced)
 ###     Expect 409 Conflict — cooldown still active
-POST http://localhost:8080/v1/users/1/earn/ads/watch
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/ads/watch
 Content-Type: application/json
 
 {
@@ -861,20 +898,20 @@ Content-Type: application/json
 
 ### 80. Record a login and claim daily bonus
 ###     First login of the day: expect 1 token earned
-POST http://localhost:8080/v1/users/1/earn/login
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/login
 Accept: application/json
 
 ### 81. Get user's login streak info
 ###     Should show currentStreak = 1, longestStreak = 1, tokensEarned = 1
-GET http://localhost:8080/v1/users/1/earn/login-streak
+GET http://localhost:8080/api/v1/users/{{dmId}}/earn/login-streak
 Accept: application/json
 
 ### 82. Try to login again same day (should return 0 tokens — already logged in today)
-POST http://localhost:8080/v1/users/1/earn/login
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/login
 Accept: application/json
 
 ### 83. Check balance (should still be 61 tokens: 60 + 1 from login)
-GET http://localhost:8080/v1/users/1/tokens
+GET http://localhost:8080/api/v1/users/{{dmId}}/tokens
 Accept: application/json
 
 
@@ -882,24 +919,28 @@ Accept: application/json
 
 ### 84. Get referral stats and code for user 1
 ###     Should show unique referral code and stats
-GET http://localhost:8080/v1/users/1/earn/referral
+GET http://localhost:8080/api/v1/users/{{dmId}}/earn/referral
 Accept: application/json
 
 ### 85. Generate a new referral code for user 1
-POST http://localhost:8080/v1/users/1/earn/referral/generate-code
+###     Codes are random, so the response handler stores it for request 86.
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/referral/generate-code
 Accept: application/json
+
+> {% client.global.set("referralCode", response.body.referralCode); %}
 
 ### 86. Apply referral code during user 2 signup
 ###     (In real app, this happens during registration, but testing after-the-fact here)
-POST http://localhost:8080/v1/users/2/earn/referral/apply
+###     Uses the code saved by request 85 — run 85 first.
+POST http://localhost:8080/api/v1/users/{{playerId}}/earn/referral/apply
 Content-Type: application/json
 
 {
-  "referralCode": "REF_ABC123XYZ"
+  "referralCode": "{{referralCode}}"
 }
 
 ### 87. Check referral stats for user 1 (should show 1 invited)
-GET http://localhost:8080/v1/users/1/earn/referral
+GET http://localhost:8080/api/v1/users/{{dmId}}/earn/referral
 Accept: application/json
 
 
@@ -907,7 +948,7 @@ Accept: application/json
 
 ### 88. Submit an app review on Google Play Store
 ###     Expect 25 tokens earned, 201 Created (first time)
-POST http://localhost:8080/v1/users/1/earn/app-review
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/app-review
 Content-Type: application/json
 
 {
@@ -918,7 +959,7 @@ Content-Type: application/json
 
 ### 89. Try to submit another review on Google Play (should fail — already rewarded on this platform)
 ###     Expect 409 Conflict, tokensEarned = 0
-POST http://localhost:8080/v1/users/1/earn/app-review
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/app-review
 Content-Type: application/json
 
 {
@@ -929,7 +970,7 @@ Content-Type: application/json
 
 ### 90. Submit review on App Store (different platform, should work)
 ###     Expect 25 tokens earned
-POST http://localhost:8080/v1/users/1/earn/app-review
+POST http://localhost:8080/api/v1/users/{{dmId}}/earn/app-review
 Content-Type: application/json
 
 {
@@ -939,69 +980,97 @@ Content-Type: application/json
 }
 
 ### 91. Check balance after reviews (should be 61 + 25 + 25 = 111 tokens)
-GET http://localhost:8080/v1/users/1/tokens
+GET http://localhost:8080/api/v1/users/{{dmId}}/tokens
 Accept: application/json
 
 ### 92. Get token transaction history (should show all transactions: ads, login, reviews)
-GET http://localhost:8080/v1/users/1/tokens/history?limit=10
+GET http://localhost:8080/api/v1/users/{{dmId}}/tokens/history?limit=10
 Accept: application/json
 
 
 ### --- SUBSCRIPTION MANAGEMENT ---
+###
+### Token rules:
+###   - allowance tokens (monthly grant + earned) roll over at renewal,
+###     but never beyond 2x the tier's monthly amount (Pro: 2,000)
+###   - purchased tokens never reset and are spent after the allowance
+###   - upgrades apply immediately; downgrades wait for the end of the cycle
 
-### 93. Get subscription details for user 1 (currently FREE tier)
-###     Should show monthlyAllowance = 50, billingCycleEnd = ~30 days from now
-GET http://localhost:8080/v1/users/1/subscription
+### 93. Get subscription details (currently FREE — no billing cycle, so the dates are null)
+GET http://localhost:8080/api/v1/users/{{dmId}}/subscription
 Accept: application/json
 
-### 94. Upgrade user 1 to Pro tier
-###     Expect 1,000 tokens granted immediately, subscription created
-POST http://localhost:8080/v1/users/1/subscription/upgrade
+### 93b. ERROR: buying tokens on FREE is not allowed
+###      Expect 403 Forbidden — buying tokens is a Pro feature
+POST http://localhost:8080/api/v1/users/{{dmId}}/tokens/purchase
+Content-Type: application/json
+
+{
+  "pack": "MEDIUM"
+}
+
+### 94. Upgrade to Pro
+###     Expect +1,000 allowance and a new 1-month billing cycle (111 -> 1,111)
+POST http://localhost:8080/api/v1/users/{{dmId}}/subscription/upgrade
 Content-Type: application/json
 
 {
   "tier": "PRO"
 }
 
-### 95. Check balance after upgrade (should be 111 + 1000 = 1111 tokens)
-GET http://localhost:8080/v1/users/1/subscription
+### 95. Buy a token pack (SMALL = 250, MEDIUM = 1,000, LARGE = 2,500)
+###     Expect purchasedTokens = 1,000 — these never reset.
+###     (No payment is taken yet; later a payment provider will trigger this.)
+POST http://localhost:8080/api/v1/users/{{dmId}}/tokens/purchase
+Content-Type: application/json
+
+{
+  "pack": "MEDIUM"
+}
+
+### 96. Check the buckets: allowanceTokens = 1,111, purchasedTokens = 1,000, allowanceCap = 2,000
+GET http://localhost:8080/api/v1/users/{{dmId}}/tokens
 Accept: application/json
 
-### 96. Check token balance (should reflect the upgrade)
-GET http://localhost:8080/v1/users/1/tokens
-Accept: application/json
-
-### 97. Upgrade to Pro+ tier
-POST http://localhost:8080/v1/users/1/subscription/upgrade
+### 97. Upgrade Pro -> Pro+ mid-cycle
+###     Grants only the difference (3,000 - 1,000 = 2,000), same billing cycle
+POST http://localhost:8080/api/v1/users/{{dmId}}/subscription/upgrade
 Content-Type: application/json
 
 {
   "tier": "PRO_PLUS"
 }
 
-### 98. Check Pro+ details (should show 3,000 monthly tokens)
-GET http://localhost:8080/v1/users/1/subscription
+### 98. Check Pro+ details (monthlyTokenAllowance = 3,000, allowanceCap = 6,000)
+GET http://localhost:8080/api/v1/users/{{dmId}}/subscription
 Accept: application/json
 
-### 99. Downgrade back to FREE
-POST http://localhost:8080/v1/users/1/subscription/downgrade-free
+### 99. Downgrade to FREE — scheduled, not immediate
+###     Expect currentTier = PRO_PLUS, pendingTier = FREE until billingCycleEnd
+POST http://localhost:8080/api/v1/users/{{dmId}}/subscription/downgrade-free
 Accept: application/json
 
-### 100. Confirm downgrade (should be back to FREE tier with 2,000 remaining balance)
-GET http://localhost:8080/v1/users/1/subscription
-Accept: application/json
+### 100. Change your mind: upgrading to the current tier cancels the downgrade
+###      Expect pendingTier = null and NO extra tokens (no farming by down/up-grading)
+POST http://localhost:8080/api/v1/users/{{dmId}}/subscription/upgrade
+Content-Type: application/json
+
+{
+  "tier": "PRO_PLUS"
+}
 
 
 ### --- TOTAL FREE TIER EARNINGS ---
 
 ### 101. Get total tokens earned from all free sources
 ###      Should show sum of ad views, referrals, login streaks, app reviews
-GET http://localhost:8080/v1/users/1/earn/total
+###      (10 from ads + 1 login + 50 reviews = 61 — subscription grants are not "earned")
+GET http://localhost:8080/api/v1/users/{{dmId}}/earn/total
 Accept: application/json
 
 ### 102. Full earning opportunities dashboard
 ###      Should show all 5 earning methods with current status and limits
-GET http://localhost:8080/v1/users/1/earn
+GET http://localhost:8080/api/v1/users/{{dmId}}/earn
 Accept: application/json
 
 
@@ -1009,11 +1078,12 @@ Accept: application/json
 
 ### 103. ERROR: Try to get account that doesn't exist (user 999)
 ###      Expect 404 Not Found
-GET http://localhost:8080/v1/users/999
+GET http://localhost:8080/api/v1/users/999
 Accept: application/json
 
 ### 104. ERROR: Try to upgrade with invalid tier
-POST http://localhost:8080/v1/users/1/subscription/upgrade
+###      Expect 400 Bad Request
+POST http://localhost:8080/api/v1/users/{{dmId}}/subscription/upgrade
 Content-Type: application/json
 
 {
@@ -1022,7 +1092,7 @@ Content-Type: application/json
 
 ### 105. ERROR: Register with email that already exists
 ###      Expect 400 Bad Request
-POST http://localhost:8080/v1/users/register
+POST http://localhost:8080/api/v1/users/register
 Content-Type: application/json
 
 {

@@ -25,6 +25,8 @@ data class CampaignInterviewRequest(
     val expectedLength: String = "",
     /** How many questions to ask back. */
     val questionCount: Int = 6,
+    /** Interviewing for a one-shot rather than a full campaign (available on Free). */
+    val oneShot: Boolean = false,
     val mock: Boolean = false,
 )
 

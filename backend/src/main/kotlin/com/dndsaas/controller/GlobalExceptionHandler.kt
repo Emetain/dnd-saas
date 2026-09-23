@@ -1,13 +1,18 @@
 package com.dndsaas.controller
 
 import com.dndsaas.service.AiValidationException
+import com.dndsaas.service.InsufficientTokensException
+import com.dndsaas.service.TierRestrictionException
 import com.dndsaas.service.LlmException
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.bind.ServletRequestBindingException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.servlet.resource.NoResourceFoundException
 
 /**
  * Translates exceptions into clean HTTP responses.
@@ -21,6 +26,11 @@ class GlobalExceptionHandler {
     fun handleNotFound(ex: NoSuchElementException): ResponseEntity<Map<String, String?>> =
         ResponseEntity.status(HttpStatus.NOT_FOUND).body(mapOf("error" to ex.message))
 
+    /** No endpoint matches the URL — without this the catch-all below turned it into a 500. */
+    @ExceptionHandler(NoResourceFoundException::class)
+    fun handleUnknownUrl(ex: NoResourceFoundException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.NOT_FOUND).body(mapOf("error" to "No endpoint for /${ex.resourcePath}"))
+
     /**
      * Validation failures raised by `require(...)` in the service layer,
      * e.g. linking objects that belong to different campaigns.
@@ -28,6 +38,28 @@ class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleBadRequest(ex: IllegalArgumentException): ResponseEntity<Map<String, String?>> =
         ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to ex.message))
+
+    /** The request body is not valid JSON or does not match the DTO, e.g. an unknown enum value. */
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun handleUnreadableBody(ex: HttpMessageNotReadableException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to ex.mostSpecificCause.message))
+
+    /** A required header is missing or malformed, e.g. no `X-User-Id`. */
+    @ExceptionHandler(ServletRequestBindingException::class)
+    fun handleMissingHeader(ex: ServletRequestBindingException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to ex.message))
+
+    /** The user cannot afford the generation; nothing was sent to the AI. */
+    @ExceptionHandler(InsufficientTokensException::class)
+    fun handleInsufficientTokens(ex: InsufficientTokensException): ResponseEntity<Map<String, Any?>> =
+        ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(
+            mapOf("error" to ex.message, "required" to ex.required, "available" to ex.available),
+        )
+
+    /** The user's subscription tier does not include this feature. */
+    @ExceptionHandler(TierRestrictionException::class)
+    fun handleTierRestriction(ex: TierRestrictionException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.FORBIDDEN).body(mapOf("error" to ex.message))
 
     /** The AI provider could not be reached or rejected the request. */
     @ExceptionHandler(LlmException::class)

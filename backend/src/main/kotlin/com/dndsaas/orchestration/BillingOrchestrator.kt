@@ -1,6 +1,7 @@
 package com.dndsaas.orchestration
 
 import com.dndsaas.domain.SubscriptionTier
+import com.dndsaas.domain.TokenPack
 import com.dndsaas.dto.EarningOpportunitiesResponse
 import com.dndsaas.dto.LoginStreakResponse
 import com.dndsaas.dto.ReferralResponse
@@ -51,6 +52,11 @@ class BillingOrchestrator(
 
     fun getTokenHistory(userId: Long, limit: Int = 50): List<com.dndsaas.dto.TokenTransactionResponse> =
         tokenService.getTransactionHistory(userId, limit)
+
+    fun purchaseTokens(userId: Long, pack: TokenPack): TokenBalanceResponse {
+        tokenService.purchaseTokens(userId, pack)
+        return tokenService.getBalanceDetails(userId)
+    }
 
     // -------- Subscription Management --------
 

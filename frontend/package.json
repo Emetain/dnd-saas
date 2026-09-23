@@ -9,11 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.4.38"
+    "lucide-vue-next": "^1.0.0",
+    "vue": "^3.4.38",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.1.2",
     "vite": "^5.4.2"
   }
 }
-

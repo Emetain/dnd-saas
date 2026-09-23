@@ -11,7 +11,10 @@ data class UserResponse(
     val email: String,
     val displayName: String,
     val subscriptionTier: SubscriptionTier,
+    /** Total spendable tokens (allowance + purchased). */
     val platformTokens: Long,
+    val allowanceTokens: Long,
+    val purchasedTokens: Long,
     val createdAt: Instant,
 )
 
@@ -29,9 +32,15 @@ data class UserRegistrationRequest(
  */
 data class TokenBalanceResponse(
     val userId: Long,
+    /** Total spendable tokens (allowance + purchased). */
     val currentTokens: Long,
+    /** Monthly grant + earned tokens; rolls over up to [allowanceCap]. */
+    val allowanceTokens: Long,
+    /** Bought tokens; never reset. */
+    val purchasedTokens: Long,
     val recentTransactions: List<TokenTransactionResponse>,
     val monthlyAllowance: Long,
+    val allowanceCap: Long,
     val tokensUsedThisMonth: Long,
 )
 
@@ -64,11 +73,15 @@ data class TokenEarnedResponse(
 data class SubscriptionDetailsResponse(
     val userId: Long,
     val currentTier: SubscriptionTier,
+    /** A downgrade that takes effect at [billingCycleEnd], or null. */
+    val pendingTier: SubscriptionTier?,
     val monthlyTokenAllowance: Long,
+    val allowanceCap: Long,
     val tokensUsedThisMonth: Long,
-    val billingCycleStart: Instant,
-    val billingCycleEnd: Instant,
-    val nextBillingDate: Instant,
+    /** Null for Free users, who have no billing cycle. */
+    val billingCycleStart: Instant?,
+    val billingCycleEnd: Instant?,
+    val nextBillingDate: Instant?,
 )
 
 /**

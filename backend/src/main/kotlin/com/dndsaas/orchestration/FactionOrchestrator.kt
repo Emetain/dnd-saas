@@ -1,11 +1,13 @@
 package com.dndsaas.orchestration
 
+import com.dndsaas.domain.SubscriptionTier
 import com.dndsaas.dto.FactionRequest
 import com.dndsaas.dto.FactionResponse
 import com.dndsaas.dto.NpcResponse
 import com.dndsaas.service.CampaignService
 import com.dndsaas.service.FactionService
 import com.dndsaas.service.NpcService
+import com.dndsaas.service.TierRestrictionException
 import org.springframework.stereotype.Component
 
 /**
@@ -21,6 +23,9 @@ class FactionOrchestrator(
 
     fun addFaction(campaignId: Long, request: FactionRequest): FactionResponse {
         val campaign = campaignService.findEntity(campaignId)
+        if (campaign.user?.subscriptionTier == SubscriptionTier.FREE) {
+            throw TierRestrictionException("Factions require Pro or higher")
+        }
         return factionService.create(campaign, request)
     }
 

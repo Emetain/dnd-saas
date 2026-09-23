@@ -2,6 +2,8 @@ package com.dndsaas.service
 
 import com.dndsaas.domain.Campaign
 import com.dndsaas.domain.GenerationType
+import com.dndsaas.domain.SubscriptionTier
+import com.dndsaas.domain.User
 import com.dndsaas.dto.GenerationRequest
 import com.dndsaas.dto.GenerationResponse
 import com.dndsaas.dto.LlmRole
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Service
  *   3. call the language model       -> [LlmClient]
  *   4. validate the response         -> [AiResponseValidator]
  *   5. store the structured result   -> [GenerationLogService]
+ *   6. charge the user's tokens      -> [TokenService]
  *
  * Generators added in Phase 4 do not talk to OpenAI themselves; they describe
  * what they want and call [generate], so context injection, validation, logging
@@ -34,6 +37,7 @@ class AiService(
     private val mockLlmClient: MockLlmClient,
     private val validator: AiResponseValidator,
     private val generationLogService: GenerationLogService,
+    private val tokenService: TokenService,
 ) {
 
     private val log = LoggerFactory.getLogger(AiService::class.java)
@@ -49,6 +53,8 @@ class AiService(
      * @param jsonSchema optional shape the reply must take, supplied by a generator
      * @param requiredFields fields the reply must contain to be accepted
      * @param systemGuidance extra rules a generator wants to impose
+     * @param user who pays for the generation; defaults to the campaign's owner
+     * @param tokenCost platform tokens charged on success; defaults to the type's cost
      */
     fun generate(
         campaign: Campaign?,
@@ -56,10 +62,19 @@ class AiService(
         jsonSchema: String? = null,
         requiredFields: List<String> = emptyList(),
         systemGuidance: String? = null,
+        user: User? = campaign?.user,
+        tokenCost: Int = request.type.tokenCost,
     ): GenerationResponse {
         val campaignId = campaign?.id
         val startedAt = System.currentTimeMillis()
         var contextCharacters = 0
+
+        // --- 0. Refuse up front if the tier or balance does not allow it, before spending an LLM call ---
+        val payerId = checkNotNull(user?.id) { "A generation must be paid for by a user" }
+        if (user!!.subscriptionTier == SubscriptionTier.FREE && !request.type.availableOnFree) {
+            throw TierRestrictionException("The ${request.type.label} generator requires Pro or higher")
+        }
+        tokenService.requireBalance(payerId, tokenCost.toLong())
 
         try {
             // --- 1. Collect campaign context (skipped when there is no campaign yet) ---
@@ -109,6 +124,20 @@ class AiService(
                 durationMillis = duration,
                 contextCharacters = contextCharacters,
             )
+
+            // --- 6. Charge only for generations that succeeded ---
+            if (tokenCost > 0) {
+                val charged = tokenService.chargeTokens(
+                    userId = payerId,
+                    amount = tokenCost.toLong(),
+                    generationLogId = logEntry.id,
+                    description = "${request.type.label} generation",
+                    campaignId = campaignId,
+                )
+                if (!charged) {
+                    throw InsufficientTokensException(tokenCost.toLong(), tokenService.getBalance(payerId))
+                }
+            }
 
             return GenerationResponse(
                 logId = logEntry.id!!,

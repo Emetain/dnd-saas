@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -36,8 +37,11 @@ class CampaignGeneratorController(
         summary = "Step 1: ask the Dungeon Master questions about their idea",
         description = "Returns tailored questions with suggested answers. Nothing is saved yet.",
     )
-    fun interview(@RequestBody request: CampaignInterviewRequest): CampaignInterviewResponse =
-        orchestrator.interview(request)
+    fun interview(
+        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @RequestBody request: CampaignInterviewRequest,
+    ): CampaignInterviewResponse =
+        orchestrator.interview(userId, request)
 
     @PostMapping("/generate")
     @Operation(
@@ -45,8 +49,11 @@ class CampaignGeneratorController(
         description = "Creates the campaign, its world lore, locations, factions, NPCs, quests " +
             "and a ready-to-run first session — all saved as structured Campaign Memory.",
     )
-    fun generate(@RequestBody request: CampaignGenerationRequest): ResponseEntity<CampaignGenerationResult> =
-        ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.generate(request))
+    fun generate(
+        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @RequestBody request: CampaignGenerationRequest,
+    ): ResponseEntity<CampaignGenerationResult> =
+        ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.generate(userId, request))
 
     @PostMapping("/one-shot")
     @Operation(
@@ -54,7 +61,10 @@ class CampaignGeneratorController(
         description = "Creates a compact, connected adventure with a decisive ending, " +
             "saved as a campaign and structured Campaign Memory.",
     )
-    fun generateOneShot(@RequestBody request: CampaignGenerationRequest): ResponseEntity<CampaignGenerationResult> =
-        ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.generateOneShot(request))
+    fun generateOneShot(
+        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @RequestBody request: CampaignGenerationRequest,
+    ): ResponseEntity<CampaignGenerationResult> =
+        ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.generateOneShot(userId, request))
 }
 

@@ -69,5 +69,6 @@ data class GeneratorInfo(
     /** Whether the result is written into Campaign Memory. */
     val persists: Boolean,
     val description: String,
+    val availableOnFree: Boolean,
 )
 

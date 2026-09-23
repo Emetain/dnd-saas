@@ -34,7 +34,7 @@ class UserService(
             displayName = request.displayName,
             passwordHash = hashPassword(request.password), // TODO: use proper password hashing (bcrypt)
             subscriptionTier = SubscriptionTier.FREE,
-            platformTokens = 50, // Free tier starting tokens
+            allowanceTokens = 50, // Free tier starting tokens
         )
 
         val saved = userRepository.save(user)
@@ -69,22 +69,15 @@ class UserService(
         userRepository.save(user)
     }
 
-    /**
-     * Update a user's platform token balance.
-     */
-    fun setTokenBalance(userId: Long, tokens: Long) {
-        val user = findEntity(userId)
-        user.platformTokens = tokens
-        userRepository.save(user)
-    }
-
     private fun toResponse(user: User): UserResponse =
         UserResponse(
             id = user.id!!,
             email = user.email,
             displayName = user.displayName,
             subscriptionTier = user.subscriptionTier,
-            platformTokens = user.platformTokens,
+            platformTokens = user.totalTokens,
+            allowanceTokens = user.allowanceTokens,
+            purchasedTokens = user.purchasedTokens,
             createdAt = user.createdAt,
         )
 

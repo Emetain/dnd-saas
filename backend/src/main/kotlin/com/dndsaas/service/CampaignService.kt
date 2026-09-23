@@ -1,6 +1,7 @@
 package com.dndsaas.service
 
 import com.dndsaas.domain.Campaign
+import com.dndsaas.domain.User
 import com.dndsaas.dto.CampaignRequest
 import com.dndsaas.dto.CampaignResponse
 import com.dndsaas.repository.CampaignRepository
@@ -16,8 +17,10 @@ class CampaignService(
     private val campaignRepository: CampaignRepository,
 ) {
 
-    fun create(request: CampaignRequest): CampaignResponse {
+    fun create(request: CampaignRequest, owner: User): CampaignResponse {
         val campaign = Campaign(
+            user = owner,
+            kind = request.kind,
             name = request.name,
             description = request.description,
             system = request.system,
@@ -41,6 +44,10 @@ class CampaignService(
     @Transactional(readOnly = true)
     fun list(): List<CampaignResponse> = campaignRepository.findAll().map(::toResponse)
 
+    @Transactional(readOnly = true)
+    fun listForUser(userId: Long): List<CampaignResponse> =
+        campaignRepository.findByUserIdOrderByUpdatedAtDesc(userId).map(::toResponse)
+
     fun delete(id: Long) = campaignRepository.deleteById(id)
 
     /** Shared lookup used by this and other services. */
@@ -51,6 +58,8 @@ class CampaignService(
     fun toResponse(campaign: Campaign): CampaignResponse =
         CampaignResponse(
             id = campaign.id!!,
+            userId = campaign.user!!.id!!,
+            kind = campaign.kind,
             name = campaign.name,
             description = campaign.description,
             system = campaign.system,

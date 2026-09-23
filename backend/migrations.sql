@@ -20,3 +20,10 @@ ALTER TABLE campaigns ADD CONSTRAINT fk_campaign_user FOREIGN KEY (user_id) REFE
 -- Drop the default constraint from the column now that it's been populated
 ALTER TABLE campaigns ALTER COLUMN user_id DROP DEFAULT;
 
+
+-- Phase 5 (token buckets, purchases & rollover cap)
+-- Hibernate created a CHECK constraint listing the token transaction types it
+-- knew about at the time, and ddl-auto: update never changes it, so the new
+-- TOKEN_PURCHASE and ALLOWANCE_EXPIRED types would be rejected.
+-- (users.purchased_tokens and subscriptions.pending_tier are added automatically.)
+ALTER TABLE token_transactions DROP CONSTRAINT IF EXISTS token_transactions_type_check;

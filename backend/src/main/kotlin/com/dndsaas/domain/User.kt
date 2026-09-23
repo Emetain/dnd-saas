@@ -8,6 +8,7 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.FetchType
 import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
+import org.hibernate.annotations.ColumnDefault
 
 /**
  * A user of the platform.
@@ -30,8 +31,17 @@ class User(
     @Enumerated(EnumType.STRING)
     var subscriptionTier: SubscriptionTier = SubscriptionTier.FREE,
 
-    /** Total platform tokens available (accrued from subscription + earned from free actions). */
-    var platformTokens: Long = 50, // Free users start with 50 tokens
+    /**
+     * Allowance tokens: the monthly subscription grant plus tokens earned from
+     * free actions. Rolls over at renewal, capped at [SubscriptionTier.allowanceCap].
+     * Kept on the original column so existing databases need no rename.
+     */
+    @Column(name = "platform_tokens")
+    var allowanceTokens: Long = 50, // Free users start with 50 tokens
+
+    /** Bought tokens. Never reset or capped, and spent only once the allowance runs out. */
+    @ColumnDefault("0")
+    var purchasedTokens: Long = 0,
 
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
     var campaigns: MutableList<Campaign> = mutableListOf(),
@@ -53,5 +63,9 @@ class User(
 
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
     var appReviews: MutableList<AppReview> = mutableListOf(),
-) : BaseEntity()
+) : BaseEntity() {
+
+    /** Everything the user can spend right now. */
+    val totalTokens: Long get() = allowanceTokens + purchasedTokens
+}
 

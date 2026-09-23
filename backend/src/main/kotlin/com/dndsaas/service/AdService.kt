@@ -24,8 +24,8 @@ class AdService(
 ) {
 
     companion object {
-        private const val TOKENS_PER_AD_VIEW = 5L
-        private const val MAX_ADS_PER_DAY = 10 // Prevent spam
+        const val TOKENS_PER_AD_VIEW = 5L
+        const val MAX_ADS_PER_DAY = 3 // Keeps free earning well below a paid tier
         private const val AD_VIEW_COOLDOWN_MINUTES = 60 // Cooldown between same ad views
     }
 
@@ -57,6 +57,10 @@ class AdService(
             return 0 // Daily limit reached
         }
 
+        if (tokenService.remainingCappedEarnings(userId) <= 0) {
+            return 0 // Monthly earning cap reached
+        }
+
         // Record the view
         val adView = AdView(
             user = user,
@@ -66,15 +70,13 @@ class AdService(
         )
         adViewRepository.save(adView)
 
-        // Reward tokens
-        tokenService.rewardTokens(
+        // Reward tokens (may be less than a full reward near the monthly cap)
+        return tokenService.rewardTokens(
             userId = userId,
             type = TokenTransactionType.AD_VIEW_REWARD,
             amount = TOKENS_PER_AD_VIEW,
             description = "Watched ad: $adId",
         )
-
-        return TOKENS_PER_AD_VIEW
     }
 
     /**

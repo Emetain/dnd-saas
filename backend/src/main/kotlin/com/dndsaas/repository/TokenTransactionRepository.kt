@@ -19,5 +19,8 @@ interface TokenTransactionRepository : JpaRepository<TokenTransaction, Long> {
     
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM TokenTransaction t WHERE t.user = ?1 AND t.createdAt >= ?2")
     fun sumTokensSince(user: User, since: Instant): Long
+
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM TokenTransaction t WHERE t.user = ?1 AND t.type = ?2 AND t.createdAt >= ?3")
+    fun sumByTypeSince(user: User, type: TokenTransactionType, since: Instant): Long
 }
 

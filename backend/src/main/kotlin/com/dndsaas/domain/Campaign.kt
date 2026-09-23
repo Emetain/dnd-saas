@@ -3,6 +3,9 @@ package com.dndsaas.domain
 import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import org.hibernate.annotations.ColumnDefault
+import jakarta.persistence.Enumerated
+import jakarta.persistence.EnumType
 import jakarta.persistence.FetchType
 import jakarta.persistence.ForeignKey
 import jakarta.persistence.JoinColumn
@@ -27,6 +30,12 @@ class Campaign(
     @Column(columnDefinition = "TEXT")
     var description: String = "",
 
+    /** A full campaign (Pro and up) or a one-shot (every tier). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @ColumnDefault("'CAMPAIGN'")
+    var kind: CampaignKind = CampaignKind.CAMPAIGN,
+
     /** The game system, e.g. "D&D 5e". Kept flexible for other TTRPGs. */
     var system: String = "D&D 5e",
 
@@ -41,4 +50,9 @@ class Campaign(
     @OneToMany(mappedBy = "campaign", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
     var characters: MutableList<Character> = mutableListOf(),
 ) : BaseEntity()
+
+enum class CampaignKind {
+    CAMPAIGN,
+    ONE_SHOT,
+}
 

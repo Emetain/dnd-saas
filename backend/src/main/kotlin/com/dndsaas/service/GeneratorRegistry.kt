@@ -50,6 +50,7 @@ class GeneratorRegistry(
                     tokenCost = it.type.tokenCost,
                     persists = it.persists,
                     description = it.description,
+                    availableOnFree = it.type.availableOnFree,
                 )
             }
             .sortedBy { it.label }

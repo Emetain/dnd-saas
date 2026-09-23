@@ -72,19 +72,16 @@ class LoginStreakService(
             streak.longestStreak = streak.currentStreak
         }
 
-        // Calculate reward
-        val tokensEarned = calculateReward(streak.currentStreak)
+        // Award tokens (the monthly earning cap may reduce the reward)
+        val tokensEarned = tokenService.rewardTokens(
+            userId = userId,
+            type = TokenTransactionType.LOGIN_STREAK_REWARD,
+            amount = calculateReward(streak.currentStreak),
+            description = "Login streak reward (day ${streak.currentStreak})",
+        )
         streak.tokensEarned += tokensEarned
 
         loginStreakRepository.save(streak)
-
-        // Award tokens
-        tokenService.rewardTokens(
-            userId = userId,
-            type = TokenTransactionType.LOGIN_STREAK_REWARD,
-            amount = tokensEarned,
-            description = "Login streak reward (day ${streak.currentStreak})",
-        )
 
         return tokensEarned
     }

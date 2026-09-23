@@ -15,8 +15,10 @@ enum class GenerationType(
     val needsItems: Boolean = false,
     /** Indicative cost in platform tokens (used from Phase 5). */
     val tokenCost: Int = 1,
+    /** Whether Free users may run it. Full campaigns and free-form questions are Pro and up. */
+    val availableOnFree: Boolean = true,
 ) {
-    CAMPAIGN("Campaign", needsRelationships = true, needsItems = true, tokenCost = 10),
+    CAMPAIGN("Campaign", needsRelationships = true, needsItems = true, tokenCost = 10, availableOnFree = false),
     ONE_SHOT("One-Shot", needsRelationships = true, tokenCost = 8),
     NPC("NPC", needsRelationships = true, tokenCost = 1),
     BACKSTORY("Character Backstory", needsRelationships = true, tokenCost = 2),
@@ -29,6 +31,6 @@ enum class GenerationType(
     PUZZLE("Puzzle", tokenCost = 2),
 
     /** Free-form question answered with full campaign context. */
-    FREEFORM("Free-form", needsRelationships = true, needsItems = true, tokenCost = 1),
+    FREEFORM("Free-form", needsRelationships = true, needsItems = true, tokenCost = 1, availableOnFree = false),
 }
 
