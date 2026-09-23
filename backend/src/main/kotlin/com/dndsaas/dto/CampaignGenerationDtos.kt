@@ -1,5 +1,6 @@
 package com.dndsaas.dto
 
+import com.dndsaas.domain.CampaignKind
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import java.time.Instant
 
@@ -50,6 +51,28 @@ data class CampaignInterviewResponse(
     val questions: List<InterviewQuestion> = emptyList(),
     val usage: TokenUsage = TokenUsage(),
     val mocked: Boolean = false,
+)
+
+/** The model's reply when asked for an idea. */
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class GeneratedIdea(
+    val idea: String = "",
+    val tone: String = "",
+    val themes: String = "",
+    /** Hours for a one-shot, sessions for a campaign. */
+    val length: Int? = null,
+)
+
+/** An idea saved on the user's account, reusable from the "Your idea" box. */
+data class SavedIdeaResponse(
+    val id: Long,
+    val kind: CampaignKind,
+    val idea: String,
+    val tone: String,
+    val themes: String,
+    /** Hours for a one-shot, sessions for a campaign; null if unknown. */
+    val length: Int?,
+    val createdAt: Instant,
 )
 
 // ---------------------------------------------------------------------------
@@ -141,6 +164,8 @@ data class GeneratedQuest(
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class GeneratedFirstSession(
     val title: String = "",
+    /** A read-aloud recap of the previous session; empty for a campaign's first session. */
+    val previouslyOn: String = "",
     val summary: String = "",
     /** Read-aloud text to start the session. */
     val openingScene: String = "",

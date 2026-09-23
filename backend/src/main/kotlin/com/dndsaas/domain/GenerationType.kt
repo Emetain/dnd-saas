@@ -18,19 +18,24 @@ enum class GenerationType(
     /** Whether Free users may run it. Full campaigns and free-form questions are Pro and up. */
     val availableOnFree: Boolean = true,
 ) {
-    CAMPAIGN("Campaign", needsRelationships = true, needsItems = true, tokenCost = 10, availableOnFree = false),
-    ONE_SHOT("One-Shot", needsRelationships = true, tokenCost = 8),
-    NPC("NPC", needsRelationships = true, tokenCost = 1),
-    BACKSTORY("Character Backstory", needsRelationships = true, tokenCost = 2),
-    QUEST("Quest", needsRelationships = true, tokenCost = 2),
-    ENCOUNTER("Encounter", tokenCost = 2),
-    RANDOM_ENCOUNTER("Random Encounter", tokenCost = 1),
-    BOSS("Boss", needsRelationships = true, needsItems = true, tokenCost = 3),
-    LOOT("Loot", needsItems = true, tokenCost = 1),
-    SHOP("Shop", needsItems = true, tokenCost = 2),
-    PUZZLE("Puzzle", tokenCost = 2),
+    // Costs: whole worlds 25-50; single features 5-15, scaled to how much they produce.
+    CAMPAIGN("Campaign", needsRelationships = true, needsItems = true, tokenCost = 50, availableOnFree = false),
+    ONE_SHOT("One-Shot", needsRelationships = true, tokenCost = 25),
+    /** A campaign or one-shot idea for the "Your idea" box; saved to the account for reuse. */
+    IDEA("Idea", tokenCost = 5),
+    /** The next session of a running campaign; cheaper than a campaign because the world exists. */
+    NEXT_SESSION("Next Session", needsRelationships = true, needsItems = true, tokenCost = 25, availableOnFree = false),
+    NPC("NPC", needsRelationships = true, tokenCost = 5),
+    BACKSTORY("Character Backstory", needsRelationships = true, tokenCost = 10),
+    QUEST("Quest", needsRelationships = true, tokenCost = 10),
+    ENCOUNTER("Encounter", tokenCost = 10),
+    RANDOM_ENCOUNTER("Random Encounter", tokenCost = 5),
+    BOSS("Boss", needsRelationships = true, needsItems = true, tokenCost = 15),
+    LOOT("Loot", needsItems = true, tokenCost = 8),
+    SHOP("Shop", needsItems = true, tokenCost = 12),
+    PUZZLE("Puzzle", tokenCost = 8),
 
     /** Free-form question answered with full campaign context. */
-    FREEFORM("Free-form", needsRelationships = true, needsItems = true, tokenCost = 1, availableOnFree = false),
+    FREEFORM("Free-form", needsRelationships = true, needsItems = true, tokenCost = 5, availableOnFree = false),
 }
 

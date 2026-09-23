@@ -1,5 +1,8 @@
 package com.dndsaas.controller
 
+import com.dndsaas.dto.NextSessionRequest
+import com.dndsaas.dto.NextSessionResult
+import com.dndsaas.dto.SessionDebrief
 import com.dndsaas.dto.SessionRequest
 import com.dndsaas.dto.SessionResponse
 import com.dndsaas.orchestration.SessionOrchestrator
@@ -48,6 +51,28 @@ class SessionController(
     @Operation(summary = "Update a session")
     fun update(@PathVariable id: Long, @RequestBody request: SessionRequest): SessionResponse =
         orchestrator.updateSession(id, request)
+
+    @PutMapping("/sessions/{id}/debrief")
+    @Operation(
+        summary = "Record what happened in a session",
+        description = "Answers to the post-session questions. Saved as the session's summary, " +
+            "which every later generation reads as campaign history.",
+    )
+    fun saveDebrief(@PathVariable id: Long, @RequestBody debrief: SessionDebrief): SessionResponse =
+        orchestrator.saveDebrief(id, debrief)
+
+    @PostMapping("/campaigns/{campaignId}/sessions/next")
+    @Operation(
+        summary = "Generate the next session of a campaign (25 tokens)",
+        description = "Builds on the campaign's idea, its memory and the debrief of the last session. " +
+            "The last session must have been debriefed first.",
+    )
+    fun planNext(
+        @PathVariable campaignId: Long,
+        @RequestBody(required = false) request: NextSessionRequest?,
+    ): ResponseEntity<NextSessionResult> =
+        ResponseEntity.status(HttpStatus.CREATED)
+            .body(orchestrator.planNextSession(campaignId, request ?: NextSessionRequest()))
 
     @DeleteMapping("/sessions/{id}")
     @Operation(summary = "Delete a session")

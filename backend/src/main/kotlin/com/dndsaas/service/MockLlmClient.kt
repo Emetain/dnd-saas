@@ -29,6 +29,8 @@ class MockLlmClient : LlmClient {
             !request.jsonMode -> "Mock response. The pipeline ran end to end using ${prompt.length} characters of prompt."
             prompt.contains("\"questions\"") -> interviewJson()
             prompt.contains("\"worldLore\"") -> campaignBlueprintJson()
+            prompt.contains("\"previouslyOn\"") -> nextSessionJson()
+            prompt.contains("\"idea\"") -> """{ "idea": "A mock idea: a lighthouse keeper hires the party to guard a light that attracts ships from other worlds.", "tone": "eerie, hopeful", "themes": "isolation, duty, the unknown", "length": 5 }"""
             // Each generator's schema has a key no other schema uses.
             prompt.contains("\"connectionsToWorld\"") -> backstoryJson()
             prompt.contains("\"hoardDescription\"") -> lootJson()
@@ -149,6 +151,19 @@ class MockLlmClient : LlmClient {
           "failureConsequence": "The dials reset and a chime echoes down the hall.",
           "bypass": "A narrow crawlspace behind the murals.",
           "skillChecks": ["Intelligence (Investigation) DC 12 to notice the mural order"]
+        }
+    """.trimIndent()
+
+    private fun nextSessionJson() = """
+        {
+          "title": "Mock Session: The Morning After",
+          "previouslyOn": "Last time, you followed the ash trail into the hills and found the furnace door warm to the touch.",
+          "summary": "The party deals with the consequences of what they found at the end of the last session.",
+          "openingScene": "Dawn breaks grey over the vale. The furnace door you left behind is open.",
+          "beats": ["The village wakes to find the door open", "A familiar NPC asks for help", "The trail leads underground"],
+          "encounters": ["Social: calm the frightened villagers", "Combat: whatever came out of the furnace"],
+          "cliffhanger": "A voice from the dark calls one of the characters by name.",
+          "dmTips": ["Let the players' choices from last session shape how the villagers react."]
         }
     """.trimIndent()
 

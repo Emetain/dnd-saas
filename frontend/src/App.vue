@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted } from 'vue'
+import AppBanner from './components/AppBanner.vue'
 import AppNavbar from './components/AppNavbar.vue'
 import WelcomeView from './views/WelcomeView.vue'
 import { useSession } from './stores/session'
@@ -11,11 +12,13 @@ onMounted(restore)
 
 <template>
   <div v-if="state.loading" class="boot"><span class="spinner" /></div>
-  <WelcomeView v-else-if="!state.user" />
   <template v-else>
+    <!-- The navbar is sticky and stays at the top; the banner below it scrolls away. -->
     <AppNavbar />
+    <AppBanner />
     <main>
-      <RouterView :key="state.user.id" />
+      <RouterView v-if="state.user" :key="state.user.id" />
+      <WelcomeView v-else />
     </main>
   </template>
 </template>
@@ -25,6 +28,6 @@ onMounted(restore)
   min-height: 100vh;
   display: grid;
   place-items: center;
-  color: var(--blue-600);
+  color: var(--primary);
 }
 </style>

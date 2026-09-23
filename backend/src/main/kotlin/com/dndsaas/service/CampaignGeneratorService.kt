@@ -9,6 +9,10 @@ import com.dndsaas.domain.User
 import com.dndsaas.dto.CampaignBlueprint
 import com.dndsaas.dto.CampaignGenerationRequest
 import com.dndsaas.dto.CampaignGenerationResult
+import com.dndsaas.dto.GeneratedIdea
+import com.dndsaas.dto.SavedIdeaResponse
+import com.dndsaas.domain.SavedIdea
+import com.dndsaas.repository.SavedIdeaRepository
 import com.dndsaas.dto.CampaignInterviewRequest
 import com.dndsaas.dto.CampaignInterviewResponse
 import com.dndsaas.dto.CampaignMemoryStats
@@ -48,6 +52,7 @@ class CampaignGeneratorService(
     private val npcService: NpcService,
     private val questService: QuestService,
     private val sessionService: SessionService,
+    private val savedIdeaRepository: SavedIdeaRepository,
 ) {
 
     private val log = LoggerFactory.getLogger(CampaignGeneratorService::class.java)
@@ -88,6 +93,7 @@ class CampaignGeneratorService(
     """.trimIndent()
 
     fun interview(request: CampaignInterviewRequest, user: User): CampaignInterviewResponse {
+        validatePartySettings(request.playerCount, request.startingLevel)
         val instruction = buildString {
             appendLine(
                 if (request.oneShot) "The Dungeon Master wants to build a one-shot for a single sitting."
@@ -124,6 +130,109 @@ class CampaignGeneratorService(
         val parsed = objectMapper.treeToValue(response.content, CampaignInterviewResponse::class.java)
         return parsed.copy(usage = response.usage, mocked = response.mocked)
     }
+
+    /**
+     * Suggests a fresh campaign or one-shot idea for the "Your idea" box,
+     * shaped by whatever preferences the DM has already filled in.
+     *
+     * Costs [GenerationType.IDEA] tokens, so the idea is saved to the account
+     * and can be reused later. Charging and saving share one transaction.
+     */
+    @Transactional
+    fun suggestIdea(request: CampaignInterviewRequest, user: User): SavedIdeaResponse {
+        validatePartySettings(request.playerCount, request.startingLevel)
+        val instruction = buildString {
+            appendLine(
+                if (request.oneShot) "Suggest one original idea for a one-shot adventure for a single sitting."
+                else "Suggest one original idea for a campaign.",
+            )
+            appendLine("Game system: ${request.system}")
+            if (request.tone.isNotBlank()) appendLine("Tone: ${request.tone}")
+            if (request.themes.isNotBlank()) appendLine("Themes: ${request.themes}")
+            request.playerCount?.let { appendLine("Players: $it") }
+            request.startingLevel?.let { appendLine("Starting level: $it") }
+            if (request.idea.isNotBlank()) appendLine("Suggest something clearly different from: ${request.idea}")
+            appendLine()
+            appendLine(
+                if (request.oneShot) "Choose a play time in hours (1-$MAX_ONE_SHOT_HOURS) that fits the idea."
+                else "Choose a campaign length in sessions (1-$MAX_CAMPAIGN_SESSIONS) that fits the idea.",
+            )
+        }
+
+        val response = aiService.generate(
+            campaign = null,
+            request = GenerationRequest(
+                type = GenerationType.IDEA,
+                instruction = instruction,
+                temperature = 1.0,
+                mock = request.mock,
+            ),
+            jsonSchema = ideaSchema(request.oneShot),
+            requiredFields = listOf("idea"),
+            systemGuidance = ideaGuidance,
+            user = user,
+        )
+        val generated = objectMapper.treeToValue(response.content, GeneratedIdea::class.java)
+        val maxLength = if (request.oneShot) MAX_ONE_SHOT_HOURS else MAX_CAMPAIGN_SESSIONS
+        val saved = savedIdeaRepository.save(
+            SavedIdea(
+                user = user,
+                kind = if (request.oneShot) CampaignKind.ONE_SHOT else CampaignKind.CAMPAIGN,
+                idea = generated.idea.trim(),
+                // What the DM already chose always wins over the model's suggestion.
+                tone = request.tone.ifBlank { generated.tone.trim() },
+                themes = request.themes.ifBlank { generated.themes.trim() },
+                length = generated.length?.coerceIn(1, maxLength),
+            ),
+        )
+        return toIdeaResponse(saved)
+    }
+
+    /** The user's saved ideas, newest first; optionally only one kind. */
+    @Transactional(readOnly = true)
+    fun savedIdeas(userId: Long, kind: CampaignKind?): List<SavedIdeaResponse> =
+        (if (kind == null) savedIdeaRepository.findByUserIdOrderByCreatedAtDesc(userId)
+        else savedIdeaRepository.findByUserIdAndKindOrderByCreatedAtDesc(userId, kind))
+            .map(::toIdeaResponse)
+
+    /** Removes one of the user's saved ideas. Another user's idea counts as not found. */
+    @Transactional
+    fun deleteIdea(userId: Long, ideaId: Long) {
+        val idea = savedIdeaRepository.findById(ideaId)
+            .filter { it.user?.id == userId }
+            .orElseThrow { NoSuchElementException("Idea $ideaId not found") }
+        savedIdeaRepository.delete(idea)
+    }
+
+    private fun toIdeaResponse(idea: SavedIdea) =
+        SavedIdeaResponse(
+            id = idea.id!!,
+            kind = idea.kind,
+            idea = idea.idea,
+            tone = idea.tone.orEmpty(),
+            themes = idea.themes.orEmpty(),
+            length = idea.length,
+            createdAt = idea.createdAt,
+        )
+
+    private fun ideaSchema(oneShot: Boolean) = """
+        {
+          "idea": "one or two sentences pitching the idea, with a hook and a twist",
+          "tone": "two to four words for the feel, e.g. dark and tense",
+          "themes": "two or three comma-separated themes, e.g. betrayal, forbidden magic",
+          "length": ${if (oneShot) "play time in hours, a whole number from 1 to $MAX_ONE_SHOT_HOURS" else "number of sessions, a whole number from 1 to $MAX_CAMPAIGN_SESSIONS"}
+        }
+    """.trimIndent()
+
+    private val ideaGuidance = """
+        You suggest ideas that make a Dungeon Master want to run them immediately.
+        - One or two sentences, never more.
+        - Give it a clear hook and one surprising twist.
+        - Avoid the obvious clichés (a tavern meeting, a generic dark lord, "save the princess").
+        - Honour any tone and themes the DM has already chosen, and return them unchanged.
+        - Otherwise choose a tone and themes that fit the idea.
+        - Choose a length that suits the scope of the idea.
+    """.trimIndent()
 
     // -----------------------------------------------------------------------
     // STEP 2 — generating the campaign
@@ -266,6 +375,7 @@ class CampaignGeneratorService(
         generationType: GenerationType,
         oneShot: Boolean,
     ): CampaignGenerationResult {
+        validatePartySettings(request.playerCount, request.startingLevel)
         val startedAt = System.currentTimeMillis()
 
         val instruction = buildString {
@@ -462,8 +572,9 @@ class CampaignGeneratorService(
             SessionRequest(
                 title = plan.title.ifBlank { "Session 1" },
                 sessionNumber = 1,
-                notes = renderSessionPlan(plan),
-                summary = plan.summary,
+                notes = SessionMarkdown.plan(plan),
+                // The summary records what happened; it is filled in by the debrief after playing.
+                summary = "",
             ),
         )
 
@@ -494,32 +605,17 @@ class CampaignGeneratorService(
         )
     }
 
-    /** Renders the session plan as readable DM notes. */
-    private fun renderSessionPlan(plan: com.dndsaas.dto.GeneratedFirstSession): String = buildString {
-        if (plan.openingScene.isNotBlank()) {
-            appendLine("## Opening scene (read aloud)")
-            appendLine(plan.openingScene)
-            appendLine()
-        }
-        if (plan.beats.isNotEmpty()) {
-            appendLine("## Beats")
-            plan.beats.forEachIndexed { index, beat -> appendLine("${index + 1}. $beat") }
-            appendLine()
-        }
-        if (plan.encounters.isNotEmpty()) {
-            appendLine("## Encounters")
-            plan.encounters.forEach { appendLine("- $it") }
-            appendLine()
-        }
-        if (plan.cliffhanger.isNotBlank()) {
-            appendLine("## Cliffhanger")
-            appendLine(plan.cliffhanger)
-            appendLine()
-        }
-        if (plan.dmTips.isNotEmpty()) {
-            appendLine("## DM tips")
-            plan.dmTips.forEach { appendLine("- $it") }
-        }
+    /** The same limits the frontend offers: up to 10 players, levels 1 to 20. */
+    private fun validatePartySettings(playerCount: Int?, startingLevel: Int?) {
+        playerCount?.let { require(it in 1..MAX_PLAYERS) { "Player count must be between 1 and $MAX_PLAYERS" } }
+        startingLevel?.let { require(it in 1..MAX_LEVEL) { "Starting level must be between 1 and $MAX_LEVEL" } }
+    }
+
+    private companion object {
+        const val MAX_PLAYERS = 10
+        const val MAX_LEVEL = 20
+        const val MAX_ONE_SHOT_HOURS = 20
+        const val MAX_CAMPAIGN_SESSIONS = 100
     }
 
     /** Maps the model's free-text type onto the enum, falling back safely. */

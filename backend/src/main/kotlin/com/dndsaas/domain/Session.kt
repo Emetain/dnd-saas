@@ -30,8 +30,15 @@ class Session(
     @Column(columnDefinition = "TEXT")
     var notes: String = "",
 
-    /** Short summary used as AI context so future generations know history. */
+    /** What actually happened, used as AI context so future generations know history. */
     @Column(columnDefinition = "TEXT")
     var summary: String = "",
+
+    /**
+     * The DM's answers to the post-session questions, as JSON, so the form can be
+     * reopened and edited. [summary] holds the same answers rendered as Markdown.
+     */
+    @Column(columnDefinition = "TEXT")
+    var debrief: String? = null,
 ) : BaseEntity()
 

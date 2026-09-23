@@ -96,7 +96,7 @@ class ShopGenerator(
             campaign,
             LocationRequest(
                 name = GeneratorJson.text(content, "name"),
-                type = LocationType.BUILDING,
+                type = LocationType.SHOP,
                 description = GeneratorJson.text(content, "description"),
                 atmosphere = GeneratorJson.text(content, "atmosphere"),
                 parentId = parentId,

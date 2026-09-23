@@ -2,6 +2,8 @@ package com.dndsaas.controller
 
 import com.dndsaas.dto.CampaignGenerationRequest
 import com.dndsaas.dto.CampaignGenerationResult
+import com.dndsaas.domain.CampaignKind
+import com.dndsaas.dto.SavedIdeaResponse
 import com.dndsaas.dto.CampaignInterviewRequest
 import com.dndsaas.dto.CampaignInterviewResponse
 import com.dndsaas.orchestration.CampaignGeneratorOrchestrator
@@ -9,9 +11,13 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -31,6 +37,36 @@ import org.springframework.web.bind.annotation.RestController
 class CampaignGeneratorController(
     private val orchestrator: CampaignGeneratorOrchestrator,
 ) {
+
+    @PostMapping("/idea")
+    @Operation(
+        summary = "Generate an idea to start from",
+        description = "Returns a one- or two-sentence campaign or one-shot idea shaped by the chosen preferences, " +
+            "and saves it to the account for reuse. Costs 5 tokens.",
+    )
+    fun suggestIdea(
+        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @RequestBody request: CampaignInterviewRequest,
+    ): ResponseEntity<SavedIdeaResponse> =
+        ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.suggestIdea(userId, request))
+
+    @GetMapping("/ideas")
+    @Operation(summary = "List the caller's saved ideas, newest first (optionally ?kind=ONE_SHOT or CAMPAIGN)")
+    fun savedIdeas(
+        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @RequestParam(required = false) kind: CampaignKind?,
+    ): List<SavedIdeaResponse> =
+        orchestrator.savedIdeas(userId, kind)
+
+    @DeleteMapping("/ideas/{ideaId}")
+    @Operation(summary = "Delete one of the caller's saved ideas")
+    fun deleteIdea(
+        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @PathVariable ideaId: Long,
+    ): ResponseEntity<Void> {
+        orchestrator.deleteIdea(userId, ideaId)
+        return ResponseEntity.noContent().build()
+    }
 
     @PostMapping("/interview")
     @Operation(

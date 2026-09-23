@@ -27,3 +27,14 @@ ALTER TABLE campaigns ALTER COLUMN user_id DROP DEFAULT;
 -- TOKEN_PURCHASE and ALLOWANCE_EXPIRED types would be rejected.
 -- (users.purchased_tokens and subscriptions.pending_tier are added automatically.)
 ALTER TABLE token_transactions DROP CONSTRAINT IF EXISTS token_transactions_type_check;
+
+-- Phase 6 (AI idea generator)
+-- Same issue as token_transactions above: the CHECK constraint on
+-- generation_logs.type predates the new IDEA generation type.
+-- (The saved_ideas table is created automatically.)
+ALTER TABLE generation_logs DROP CONSTRAINT IF EXISTS generation_logs_type_check;
+
+-- Phase 6 (shops and session planning)
+-- The new SHOP location type hits the same CHECK-constraint issue.
+-- (sessions.debrief is added automatically.)
+ALTER TABLE locations DROP CONSTRAINT IF EXISTS locations_type_check;

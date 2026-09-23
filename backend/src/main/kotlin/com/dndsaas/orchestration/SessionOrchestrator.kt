@@ -1,7 +1,11 @@
 package com.dndsaas.orchestration
 
+import com.dndsaas.dto.NextSessionRequest
+import com.dndsaas.dto.NextSessionResult
+import com.dndsaas.dto.SessionDebrief
 import com.dndsaas.dto.SessionRequest
 import com.dndsaas.dto.SessionResponse
+import com.dndsaas.service.SessionPlannerService
 import com.dndsaas.service.SessionService
 import org.springframework.stereotype.Component
 
@@ -11,6 +15,7 @@ import org.springframework.stereotype.Component
 @Component
 class SessionOrchestrator(
     private val sessionService: SessionService,
+    private val sessionPlannerService: SessionPlannerService,
 ) {
     fun createSession(campaignId: Long, request: SessionRequest): SessionResponse =
         sessionService.create(campaignId, request)
@@ -24,5 +29,12 @@ class SessionOrchestrator(
         sessionService.update(id, request)
 
     fun deleteSession(id: Long) = sessionService.delete(id)
+
+    /** Task: record what happened in a session after it was played. */
+    fun saveDebrief(id: Long, debrief: SessionDebrief): SessionResponse = sessionService.saveDebrief(id, debrief)
+
+    /** Task: plan the next session from the campaign and the last debrief. */
+    fun planNextSession(campaignId: Long, request: NextSessionRequest): NextSessionResult =
+        sessionPlannerService.planNext(campaignId, request)
 }
 

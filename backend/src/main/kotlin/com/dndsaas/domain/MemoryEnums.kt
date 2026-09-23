@@ -9,6 +9,8 @@ enum class LocationType {
     VILLAGE,
     DISTRICT,
     BUILDING,
+    /** A shop, with its shopkeeper and stock linked to it. */
+    SHOP,
     DUNGEON,
     LANDMARK,
     PLANE,

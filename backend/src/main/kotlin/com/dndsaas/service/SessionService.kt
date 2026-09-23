@@ -1,9 +1,11 @@
 package com.dndsaas.service
 
 import com.dndsaas.domain.Session
+import com.dndsaas.dto.SessionDebrief
 import com.dndsaas.dto.SessionRequest
 import com.dndsaas.dto.SessionResponse
 import com.dndsaas.repository.SessionRepository
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional
 class SessionService(
     private val sessionRepository: SessionRepository,
     private val campaignService: CampaignService,
+    private val objectMapper: ObjectMapper,
 ) {
 
     fun create(campaignId: Long, request: SessionRequest): SessionResponse {
@@ -47,6 +50,18 @@ class SessionService(
         return toResponse(sessionRepository.save(session))
     }
 
+    /**
+     * Records what happened in a session. The answers are kept for editing, and
+     * rendered into [Session.summary], which the AI reads as campaign history.
+     */
+    fun saveDebrief(id: Long, debrief: SessionDebrief): SessionResponse {
+        require(debrief.whatHappened.isNotBlank()) { "Describe what happened in the session" }
+        val session = findEntity(id)
+        session.debrief = objectMapper.writeValueAsString(debrief)
+        session.summary = SessionMarkdown.debrief(debrief)
+        return toResponse(sessionRepository.save(session))
+    }
+
     fun delete(id: Long) = sessionRepository.deleteById(id)
 
     fun findEntity(id: Long): Session =
@@ -62,6 +77,7 @@ class SessionService(
             date = session.date,
             notes = session.notes,
             summary = session.summary,
+            debrief = session.debrief?.let { objectMapper.readValue(it, SessionDebrief::class.java) },
         )
 }
 

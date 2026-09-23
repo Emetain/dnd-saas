@@ -89,6 +89,13 @@ export const characterApi = {
   remove: (id) => request(`/characters/${id}`, { method: 'DELETE' }),
 }
 
+export const sessionApi = {
+  /** Record what happened in a session (the post-session questions). */
+  saveDebrief: (sessionId, debrief) => put(`/sessions/${sessionId}/debrief`, debrief),
+  /** Generate the next session of a campaign (25 tokens). */
+  next: (campaignId) => post(`/campaigns/${campaignId}/sessions/next`, {}),
+}
+
 export const generatorApi = {
   /** Any in-campaign generator module (NPC, Quest, Loot, ...). */
   run: (campaignId, type, body) => post(`/campaigns/${campaignId}/generate/${type}`, body),
@@ -99,6 +106,10 @@ export const generatorApi = {
 }
 
 export const campaignGeneratorApi = {
+  /** Generates an idea for the "Your idea" box (5 tokens) and saves it to the account. */
+  idea: (body) => post('/ai/campaign-generator/idea', body),
+  savedIdeas: (kind) => request(`/ai/campaign-generator/ideas${kind ? `?kind=${kind}` : ''}`),
+  deleteIdea: (id) => request(`/ai/campaign-generator/ideas/${id}`, { method: 'DELETE' }),
   interview: (body) => post('/ai/campaign-generator/interview', body),
   generate: (body) => post('/ai/campaign-generator/generate', body),
   oneShot: (body) => post('/ai/campaign-generator/one-shot', body),
