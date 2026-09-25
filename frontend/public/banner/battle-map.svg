@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M60 0 H0 V60" fill="none" stroke="#000" stroke-opacity="0.28" stroke-width="2"/>
+    </pattern>
+    <linearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f6a3a"/>
+      <stop offset="1" stop-color="#2f4426"/>
+    </linearGradient>
+    <linearGradient id="river" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2f6f8f"/>
+      <stop offset="1" stop-color="#3f8fb0"/>
+    </linearGradient>
+    <radialGradient id="fireball" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffd27a" stop-opacity="0.95"/>
+      <stop offset="0.45" stop-color="#ff7a3d" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#e5484d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="token-red" cx="40%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#ff8a8f"/><stop offset="1" stop-color="#a8202a"/>
+    </radialGradient>
+    <radialGradient id="token-blue" cx="40%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#9dbbff"/><stop offset="1" stop-color="#1f4fd1"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#ground)"/>
+
+  <!-- Stone ruin floor -->
+  <path d="M780 120 H1320 V600 H780 Z" fill="#7a7466"/>
+  <path d="M780 120 H1320 V600 H780 Z" fill="none" stroke="#3c3830" stroke-width="18"/>
+  <path d="M1020 120 V300" stroke="#3c3830" stroke-width="18"/>
+  <path d="M1020 420 V600" stroke="#3c3830" stroke-width="18"/>
+  <g fill="#6a6458"><rect x="840" y="180" width="60" height="60"/><rect x="1140" y="240" width="60" height="60"/><rect x="1080" y="480" width="60" height="60"/></g>
+
+  <!-- River and bridge -->
+  <path d="M0 700 C200 640 380 740 560 700 C700 670 740 780 900 800 C1100 830 1300 760 1600 820 V900 H0 Z" fill="url(#river)"/>
+  <path d="M0 700 C200 640 380 740 560 700 C700 670 740 780 900 800 C1100 830 1300 760 1600 820" fill="none" stroke="#b9e3f2" stroke-opacity="0.5" stroke-width="6"/>
+  <rect x="420" y="640" width="120" height="150" rx="6" fill="#8a5a33" stroke="#4d2f17" stroke-width="6"/>
+  <g stroke="#4d2f17" stroke-width="4"><path d="M420 670 H540"/><path d="M420 700 H540"/><path d="M420 730 H540"/><path d="M420 760 H540"/></g>
+
+  <!-- Trees: dark shadow, lighter canopy, sunlit highlight -->
+  <g>
+    <circle cx="188" cy="210" r="70" fill="#162612" opacity="0.6"/><circle cx="180" cy="200" r="70" fill="#5d8a3c"/><circle cx="162" cy="182" r="38" fill="#7aa84e"/>
+    <circle cx="338" cy="130" r="55" fill="#162612" opacity="0.6"/><circle cx="330" cy="120" r="55" fill="#5d8a3c"/><circle cx="316" cy="106" r="30" fill="#7aa84e"/>
+    <circle cx="528" cy="310" r="60" fill="#162612" opacity="0.6"/><circle cx="520" cy="300" r="60" fill="#5d8a3c"/><circle cx="505" cy="285" r="33" fill="#7aa84e"/>
+    <circle cx="1468" cy="430" r="70" fill="#162612" opacity="0.6"/><circle cx="1460" cy="420" r="70" fill="#5d8a3c"/><circle cx="1442" cy="402" r="38" fill="#7aa84e"/>
+    <circle cx="98" cy="430" r="50" fill="#162612" opacity="0.6"/><circle cx="90" cy="420" r="50" fill="#5d8a3c"/><circle cx="78" cy="408" r="28" fill="#7aa84e"/>
+  </g>
+
+  <rect width="1600" height="900" fill="url(#grid)"/>
+
+  <!-- Fireball area of effect -->
+  <circle cx="1080" cy="360" r="170" fill="url(#fireball)"/>
+  <circle cx="1080" cy="360" r="170" fill="none" stroke="#ffb35c" stroke-width="4" stroke-dasharray="14 10"/>
+
+  <!-- Enemy tokens -->
+  <g stroke="#2a0d10" stroke-width="5">
+    <circle cx="1050" cy="330" r="26" fill="url(#token-red)"/>
+    <circle cx="1110" cy="390" r="26" fill="url(#token-red)"/>
+    <circle cx="1170" cy="330" r="26" fill="url(#token-red)"/>
+    <circle cx="1230" cy="510" r="40" fill="url(#token-red)"/>
+  </g>
+  <path d="M1218 498 l12 -20 l12 20 l-6 0 l0 18 l-12 0 l0 -18 z" fill="#ffe3b0"/>
+
+  <!-- Hero tokens -->
+  <g stroke="#0b1a45" stroke-width="5">
+    <circle cx="690" cy="390" r="26" fill="url(#token-blue)"/>
+    <circle cx="630" cy="450" r="26" fill="url(#token-blue)"/>
+    <circle cx="690" cy="510" r="26" fill="url(#token-blue)"/>
+    <circle cx="570" cy="390" r="26" fill="url(#token-blue)"/>
+  </g>
+
+  <!-- Movement arrow -->
+  <path d="M720 390 C800 360 860 350 900 350" fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="5" stroke-dasharray="10 10"/>
+  <path d="M900 336 l24 14 l-24 14 z" fill="#fff" fill-opacity="0.85"/>
+</svg>
