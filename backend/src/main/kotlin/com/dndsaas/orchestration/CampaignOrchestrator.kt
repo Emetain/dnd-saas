@@ -34,8 +34,7 @@ class CampaignOrchestrator(
 
     fun getCampaign(id: Long): CampaignResponse = campaignService.get(id)
 
-    fun listCampaigns(userId: Long? = null): List<CampaignResponse> =
-        if (userId == null) campaignService.list() else campaignService.listForUser(userId)
+    fun listCampaigns(userId: Long): List<CampaignResponse> = campaignService.listForUser(userId)
 
     /**
      * Task: delete a campaign and everything it remembers.

@@ -5,6 +5,7 @@ import com.dndsaas.dto.NextSessionResult
 import com.dndsaas.dto.SessionDebrief
 import com.dndsaas.dto.SessionRequest
 import com.dndsaas.dto.SessionResponse
+import com.dndsaas.dto.SessionRewriteRequest
 import com.dndsaas.orchestration.SessionOrchestrator
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -64,8 +65,8 @@ class SessionController(
     @PostMapping("/campaigns/{campaignId}/sessions/next")
     @Operation(
         summary = "Generate the next session of a campaign (25 tokens)",
-        description = "Builds on the campaign's idea, its memory and the debrief of the last session. " +
-            "The last session must have been debriefed first.",
+        description = "Builds on the campaign's idea, its memory and the debrief of the last session — " +
+            "or, if that session has not been played yet, on its plan (making the campaign longer).",
     )
     fun planNext(
         @PathVariable campaignId: Long,
@@ -73,6 +74,22 @@ class SessionController(
     ): ResponseEntity<NextSessionResult> =
         ResponseEntity.status(HttpStatus.CREATED)
             .body(orchestrator.planNextSession(campaignId, request ?: NextSessionRequest()))
+
+    @PutMapping("/sessions/{id}/completed")
+    @Operation(summary = "Mark a session as played (completed) or not", description = "Body: { \"completed\": true }")
+    fun setCompleted(@PathVariable id: Long, @RequestBody body: Map<String, Boolean>): SessionResponse =
+        orchestrator.setCompleted(id, body["completed"] ?: true)
+
+    @PostMapping("/sessions/{id}/rewrite")
+    @Operation(
+        summary = "Re-plan a session that has not been played yet (15 tokens)",
+        description = "Takes the DM's wishes and the sessions before it into account. Played sessions can't be rewritten.",
+    )
+    fun rewrite(
+        @PathVariable id: Long,
+        @RequestBody(required = false) request: SessionRewriteRequest?,
+    ): NextSessionResult =
+        orchestrator.rewriteSession(id, request ?: SessionRewriteRequest())
 
     @DeleteMapping("/sessions/{id}")
     @Operation(summary = "Delete a session")

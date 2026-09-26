@@ -3,8 +3,13 @@
 ###         user's tokens. Run #0 and #0b first; the id is saved as {{ownerId}}.
 ### =====================================================================
 
-### 0. Register the account that owns the campaigns below
-POST http://localhost:8080/api/v1/users/register
+### Sign-in: registering or signing in sets a session cookie, which the IntelliJ
+### HTTP client keeps and sends with every later request. Every endpoint except
+### register/login acts as the account signed in LAST, and /users/{id}/... only
+### works for that account — run the matching "sign in" request to switch.
+
+### 0. Register the account that owns the campaigns below (this also signs it in)
+POST http://localhost:8080/api/v1/auth/register
 Content-Type: application/json
 
 {
@@ -14,6 +19,15 @@ Content-Type: application/json
 }
 
 > {% client.global.set("ownerId", response.body.id); %}
+
+### 0a. Sign in as the owner again (after a restart, or after using another account)
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "owner@example.com",
+  "password": "owner_password_123"
+}
 
 ### 0b. Upgrade the owner to Ultimate DM so the generator tests below have enough tokens
 POST http://localhost:8080/api/v1/users/{{ownerId}}/subscription/upgrade
@@ -34,7 +48,6 @@ Accept: application/json
 
 ### 2. Create a campaign  (expect 201 Created + a JSON body with "id": 1)
 POST http://localhost:8080/api/v1/campaigns
-X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -636,7 +649,6 @@ Accept: application/json
 ### 60. STEP 1 (free): give a rough idea, get questions back.
 ###     Nothing is saved yet — this is just the interview.
 POST http://localhost:8080/api/v1/ai/campaign-generator/interview
-X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -656,7 +668,6 @@ Content-Type: application/json
 ###     look at the campaign in the database — the locations, factions,
 ###     NPCs and quests are all REAL ROWS, already linked to each other.
 POST http://localhost:8080/api/v1/ai/campaign-generator/generate
-X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -712,7 +723,6 @@ Accept: application/json
 
 ### 65. STEP 1 for real: the AI interviews you about your idea.
 POST http://localhost:8080/api/v1/ai/campaign-generator/interview
-X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -733,7 +743,6 @@ Content-Type: application/json
 ###     pulled in by an accidental discovery, and an ending built around
 ###     choosing which truth survives.
 POST http://localhost:8080/api/v1/ai/campaign-generator/generate
-X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -788,7 +797,6 @@ Content-Type: application/json
 ### 67. Generating without doing the interview also works — the answers
 ###     array is simply optional.
 POST http://localhost:8080/api/v1/ai/campaign-generator/generate
-X-User-Id: {{ownerId}}
 Content-Type: application/json
 
 {
@@ -812,7 +820,7 @@ Content-Type: application/json
 
 ### 70. Register a new user account
 ###     Expect 201 Created. User should have 50 starting tokens.
-POST http://localhost:8080/api/v1/users/register
+POST http://localhost:8080/api/v1/auth/register
 Content-Type: application/json
 
 {
@@ -829,7 +837,7 @@ GET http://localhost:8080/api/v1/users/{{dmId}}
 Accept: application/json
 
 ### 72. Register another user (for referral tests later)
-POST http://localhost:8080/api/v1/users/register
+POST http://localhost:8080/api/v1/auth/register
 Content-Type: application/json
 
 {
@@ -840,6 +848,16 @@ Content-Type: application/json
 
 > {% client.global.set("playerId", response.body.id); %}
 
+
+
+### 72b. Sign back in as the DM — registering the player signed this client in as the player
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "dm@example.com",
+  "password": "secure_password_123"
+}
 
 ### --- TOKEN MANAGEMENT ---
 
@@ -1093,12 +1111,12 @@ Content-Type: application/json
 
 ### 105. ERROR: Register with email that already exists
 ###      Expect 400 Bad Request
-POST http://localhost:8080/api/v1/users/register
+POST http://localhost:8080/api/v1/auth/register
 Content-Type: application/json
 
 {
   "email": "dm@example.com",
   "displayName": "Another DM",
-  "password": "password"
+  "password": "another_password"
 }
 

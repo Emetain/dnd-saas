@@ -1,14 +1,14 @@
 <script setup>
 import { computed } from 'vue'
 import { findGenerator } from '../../data/generators'
-import { useSession } from '../../stores/session'
+import { useAccess } from '../../stores/access'
 import WorldGenerator from './WorldGenerator.vue'
 import ModuleGenerator from './ModuleGenerator.vue'
 import UpgradePrompt from '../../components/UpgradePrompt.vue'
 
 /** Picks the right screen for the generator in the URL. */
 const props = defineProps({ slug: { type: String, required: true } })
-const { isFree } = useSession()
+const { isLocked } = useAccess()
 
 const generator = computed(() => findGenerator(props.slug))
 </script>
@@ -27,7 +27,7 @@ const generator = computed(() => findGenerator(props.slug))
       <span class="badge badge-navy">{{ generator.cost }} tokens</span>
     </div>
 
-    <UpgradePrompt v-if="isFree && !generator.free" :feature="generator.label" />
+    <UpgradePrompt v-if="isLocked(generator)" :feature="generator.label" :tier="generator.minTier" />
     <WorldGenerator v-else-if="generator.kind === 'world'" :generator="generator" />
     <ModuleGenerator v-else :generator="generator" />
   </div>

@@ -29,6 +29,8 @@ class MockLlmClient : LlmClient {
             !request.jsonMode -> "Mock response. The pipeline ran end to end using ${prompt.length} characters of prompt."
             prompt.contains("\"questions\"") -> interviewJson()
             prompt.contains("\"worldLore\"") -> campaignBlueprintJson()
+            // A batch of sessions for a campaign generated with all its sessions at once.
+            prompt.contains("{ \"sessions\": [") -> sessionBatchJson(prompt)
             prompt.contains("\"previouslyOn\"") -> nextSessionJson()
             prompt.contains("\"idea\"") -> """{ "idea": "A mock idea: a lighthouse keeper hires the party to guard a light that attracts ships from other worlds.", "tone": "eerie, hopeful", "themes": "isolation, duty, the unknown", "length": 5 }"""
             // Each generator's schema has a key no other schema uses.
@@ -50,6 +52,11 @@ class MockLlmClient : LlmClient {
             model = "mock",
             mocked = true,
         )
+    }
+
+    private fun sessionBatchJson(prompt: String): String {
+        val count = Regex("""\((\d+) sessions\)""").find(prompt)?.groupValues?.get(1)?.toInt() ?: 1
+        return """{ "sessions": [${List(count) { nextSessionJson() }.joinToString(",")}] }"""
     }
 
     private fun genericJson(promptLength: Int) = """

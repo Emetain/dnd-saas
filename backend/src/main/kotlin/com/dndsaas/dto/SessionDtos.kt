@@ -24,6 +24,8 @@ data class SessionResponse(
     val summary: String,
     /** The answers behind [summary], or null if the session has not been debriefed yet. */
     val debrief: SessionDebrief?,
+    /** Played (marked completed, or debriefed). */
+    val completed: Boolean,
 )
 
 /**
@@ -50,6 +52,15 @@ data class SessionDebrief(
 )
 
 data class NextSessionRequest(
+    /** Optional wishes for the new session, e.g. when extending a campaign. */
+    val wishes: String = "",
+    val mock: Boolean = false,
+)
+
+/** Re-plans a session that has not been played yet. */
+data class SessionRewriteRequest(
+    /** What the DM wants changed; may be empty to simply get a fresh take. */
+    val wishes: String = "",
     val mock: Boolean = false,
 )
 

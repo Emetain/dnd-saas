@@ -71,8 +71,10 @@ class AiService(
 
         // --- 0. Refuse up front if the tier or balance does not allow it, before spending an LLM call ---
         val payerId = checkNotNull(user?.id) { "A generation must be paid for by a user" }
-        if (user!!.subscriptionTier == SubscriptionTier.FREE && !request.type.availableOnFree) {
-            throw TierRestrictionException("The ${request.type.label} generator requires Pro or higher")
+        if (!user!!.emailVerified) throw EmailNotVerifiedException()
+        val requiredTier = request.type.minimumTier
+        if (user!!.subscriptionTier < requiredTier) {
+            throw TierRestrictionException("The ${request.type.label} generator requires ${requiredTier.label} or higher", requiredTier)
         }
         tokenService.requireBalance(payerId, tokenCost.toLong())
 

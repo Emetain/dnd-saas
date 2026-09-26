@@ -1,9 +1,9 @@
 <script setup>
 import { Lock } from 'lucide-vue-next'
 import { generatorGroups } from '../data/generators'
-import { useSession } from '../stores/session'
+import { useAccess } from '../stores/access'
 
-const { isFree } = useSession()
+const { isLocked, guardGenerator } = useAccess()
 </script>
 
 <template>
@@ -17,11 +17,13 @@ const { isFree } = useSession()
           :key="gen.slug"
           :to="{ path: `/generators/${gen.slug}`, query: $route.query.campaign ? { campaign: $route.query.campaign } : {} }"
           class="item"
+          :class="{ 'is-locked': isLocked(gen) }"
           active-class="active"
+          @click.capture="guardGenerator($event, gen)"
         >
           <component :is="gen.icon" :size="16" />
           <span class="name">{{ gen.label }}</span>
-          <Lock v-if="isFree && !gen.free" :size="12" class="lock" />
+          <Lock v-if="isLocked(gen)" :size="12" class="lock" />
           <span v-else class="cost">{{ gen.cost }}</span>
         </RouterLink>
       </div>

@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional
 class SessionService(
+    private val memoryReferences: MemoryReferences,
     private val sessionRepository: SessionRepository,
     private val campaignService: CampaignService,
     private val objectMapper: ObjectMapper,
@@ -59,10 +60,29 @@ class SessionService(
         val session = findEntity(id)
         session.debrief = objectMapper.writeValueAsString(debrief)
         session.summary = SessionMarkdown.debrief(debrief)
+        // Notes on what happened mean it was played.
+        session.completed = true
         return toResponse(sessionRepository.save(session))
     }
 
-    fun delete(id: Long) = sessionRepository.deleteById(id)
+    fun setCompleted(id: Long, completed: Boolean): SessionResponse {
+        val session = findEntity(id)
+        session.completed = completed
+        return toResponse(sessionRepository.save(session))
+    }
+
+    /** Deletes a session and moves the ones after it up, so the numbers stay 1, 2, 3… */
+    fun delete(id: Long) {
+        val session = findEntity(id)
+        val campaignId = session.campaign!!.id!!
+        val number = session.sessionNumber
+        memoryReferences.detachSession(id)
+        sessionRepository.delete(session)
+        sessionRepository.flush()
+        sessionRepository.findByCampaignIdOrderBySessionNumberAsc(campaignId)
+            .filter { it.sessionNumber > number }
+            .forEach { it.sessionNumber-- }
+    }
 
     fun findEntity(id: Long): Session =
         sessionRepository.findById(id)
@@ -78,6 +98,7 @@ class SessionService(
             notes = session.notes,
             summary = session.summary,
             debrief = session.debrief?.let { objectMapper.readValue(it, SessionDebrief::class.java) },
+            completed = session.isPlayed,
         )
 }
 

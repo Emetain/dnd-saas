@@ -1,6 +1,7 @@
 package com.dndsaas.dto
 
 import com.dndsaas.domain.GenerationType
+import com.dndsaas.domain.SubscriptionTier
 import com.fasterxml.jackson.databind.JsonNode
 import java.time.Instant
 
@@ -70,5 +71,7 @@ data class GeneratorInfo(
     val persists: Boolean,
     val description: String,
     val availableOnFree: Boolean,
+    /** The lowest plan that may run it. */
+    val minimumTier: SubscriptionTier,
 )
 

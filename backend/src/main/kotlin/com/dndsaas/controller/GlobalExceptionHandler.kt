@@ -7,6 +7,11 @@ import com.dndsaas.service.PaymentsDisabledException
 import com.dndsaas.service.AiValidationException
 import com.dndsaas.service.InsufficientTokensException
 import com.dndsaas.service.TierRestrictionException
+import com.dndsaas.service.InvalidCredentialsException
+import com.dndsaas.service.NotSignedInException
+import com.dndsaas.service.NotYourAccountException
+import com.dndsaas.service.EmailNotVerifiedException
+import com.dndsaas.service.TooManyLoginAttemptsException
 import com.dndsaas.service.LlmException
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
@@ -80,10 +85,27 @@ class GlobalExceptionHandler {
     fun handleInvalidWebhook(ex: InvalidWebhookException): ResponseEntity<Map<String, String?>> =
         ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to ex.message))
 
+    /** Not signed in, or the session expired: the frontend shows the sign-in page. */
+    @ExceptionHandler(NotSignedInException::class, InvalidCredentialsException::class)
+    fun handleUnauthenticated(ex: RuntimeException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf("error" to ex.message))
+
+    @ExceptionHandler(TooManyLoginAttemptsException::class)
+    fun handleTooManyAttempts(ex: TooManyLoginAttemptsException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(mapOf("error" to ex.message))
+
+    @ExceptionHandler(EmailNotVerifiedException::class)
+    fun handleEmailNotVerified(ex: EmailNotVerifiedException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.FORBIDDEN).body(mapOf("error" to ex.message, "code" to "EMAIL_NOT_VERIFIED"))
+
+    @ExceptionHandler(NotYourAccountException::class)
+    fun handleNotYourAccount(ex: NotYourAccountException): ResponseEntity<Map<String, String?>> =
+        ResponseEntity.status(HttpStatus.FORBIDDEN).body(mapOf("error" to ex.message))
+
     /** The user's subscription tier does not include this feature. */
     @ExceptionHandler(TierRestrictionException::class)
     fun handleTierRestriction(ex: TierRestrictionException): ResponseEntity<Map<String, String?>> =
-        ResponseEntity.status(HttpStatus.FORBIDDEN).body(mapOf("error" to ex.message))
+        ResponseEntity.status(HttpStatus.FORBIDDEN).body(mapOf("error" to ex.message, "requiredTier" to ex.requiredTier.name))
 
     /** The AI provider could not be reached or rejected the request. */
     @ExceptionHandler(LlmException::class)

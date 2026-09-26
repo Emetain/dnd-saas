@@ -5,7 +5,8 @@ import { ChevronDown } from 'lucide-vue-next'
 
 /**
  * A navbar item that opens a panel on click (and closes on outside click,
- * Escape or navigation). The panel content comes from the default slot.
+ * Escape or navigation). The panel content comes from the default slot;
+ * the `trigger` slot replaces the plain text label (e.g. with an avatar).
  */
 defineProps({
   label: { type: String, required: true },
@@ -41,7 +42,7 @@ onBeforeUnmount(() => { open.value = false })
 <template>
   <div ref="root" class="dropdown">
     <button class="trigger" :class="{ active, open }" :aria-expanded="open" @click="open = !open">
-      {{ label }}
+      <slot name="trigger">{{ label }}</slot>
       <ChevronDown :size="14" class="chevron" />
     </button>
     <div v-if="open" class="panel" :class="[`align-${align}`, { wide }]" role="menu">

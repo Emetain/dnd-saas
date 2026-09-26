@@ -29,6 +29,12 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
+    // Email: account verification and password resets (SMTP; Mailpit in development)
+    implementation("org.springframework.boot:spring-boot-starter-mail")
+
+    // Password hashing (BCrypt) — only the crypto module, not the full Spring Security stack
+    implementation("org.springframework.security:spring-security-crypto")
+
     // Payments (Stripe Checkout, Customer Portal and webhooks)
     implementation("com.stripe:stripe-java:29.2.0")
 

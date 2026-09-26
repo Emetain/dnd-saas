@@ -12,9 +12,9 @@ enum class SubscriptionTier(
     val priceEuroCents: Int = 0,
 ) {
     FREE("Free", monthlyTokens = 50), // Starter tokens, can earn more
-    PRO("Pro", monthlyTokens = 1_000, priceEuroCents = 1_000),
-    PRO_PLUS("Pro+", monthlyTokens = 3_000, priceEuroCents = 2_500),
-    ULTIMATE_DM("Ultimate DM", monthlyTokens = 5_000, priceEuroCents = 5_000),
+    PRO("Pro", monthlyTokens = 1_000, priceEuroCents = 999),
+    PRO_PLUS("Pro+", monthlyTokens = 3_000, priceEuroCents = 2_499),
+    ULTIMATE_DM("Ultimate DM", monthlyTokens = 5_000, priceEuroCents = 4_999),
     ;
 
     /**
@@ -29,9 +29,9 @@ enum class SubscriptionTier(
  * Packs cost more per token than a subscription, so subscribing stays the better deal.
  */
 enum class TokenPack(val tokens: Long, val priceEuroCents: Int) {
-    SMALL(250, priceEuroCents = 500),      // €5  — €0.020 per token
-    MEDIUM(1_000, priceEuroCents = 1_500), // €15 — €0.015 per token
-    LARGE(2_500, priceEuroCents = 2_500),  // €25 — €0.010 per token
+    SMALL(250, priceEuroCents = 499),      // €4.99  — ~€0.020 per token
+    MEDIUM(1_000, priceEuroCents = 1_499), // €14.99 — ~€0.015 per token
+    LARGE(2_500, priceEuroCents = 2_499),  // €24.99 — ~€0.010 per token
 }
 
 /**

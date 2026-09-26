@@ -1,6 +1,7 @@
 package com.dndsaas.service
 
 import com.dndsaas.domain.GenerationType
+import com.dndsaas.domain.SubscriptionTier
 import com.dndsaas.dto.GeneratorInfo
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -50,7 +51,8 @@ class GeneratorRegistry(
                     tokenCost = it.type.tokenCost,
                     persists = it.persists,
                     description = it.description,
-                    availableOnFree = it.type.availableOnFree,
+                    availableOnFree = it.type.minimumTier == SubscriptionTier.FREE,
+                    minimumTier = it.type.minimumTier,
                 )
             }
             .sortedBy { it.label }

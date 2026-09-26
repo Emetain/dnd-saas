@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional
 class LocationService(
+    private val memoryReferences: MemoryReferences,
     private val locationRepository: LocationRepository,
 ) {
 
@@ -46,7 +47,10 @@ class LocationService(
     fun listChildren(parentId: Long): List<LocationResponse> =
         locationRepository.findByParentIdOrderByNameAsc(parentId).map(::toResponse)
 
-    fun delete(id: Long) = locationRepository.deleteById(id)
+    fun delete(id: Long) {
+        memoryReferences.detachLocation(id)
+        locationRepository.deleteById(id)
+    }
 
     fun findEntity(id: Long): Location =
         locationRepository.findById(id)

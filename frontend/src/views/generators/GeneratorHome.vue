@@ -1,9 +1,10 @@
 <script setup>
 import { Lock } from 'lucide-vue-next'
 import { generatorGroups } from '../../data/generators'
-import { useSession } from '../../stores/session'
+import { useAccess } from '../../stores/access'
+import { tierLabels } from '../../stores/session'
 
-const { isFree } = useSession()
+const { isLocked, guardGenerator } = useAccess()
 </script>
 
 <template>
@@ -18,12 +19,12 @@ const { isFree } = useSession()
     <section v-for="group in generatorGroups" :key="group.id" class="group">
       <h2>{{ group.label }}</h2>
       <div class="grid grid-2">
-        <RouterLink v-for="gen in group.generators" :key="gen.slug" :to="`/generators/${gen.slug}`" class="card card-link gen">
+        <RouterLink v-for="gen in group.generators" :key="gen.slug" :to="`/generators/${gen.slug}`" class="card card-link gen" :class="{ 'is-locked': isLocked(gen) }" @click.capture="guardGenerator($event, gen)">
           <span class="icon"><component :is="gen.icon" :size="18" /></span>
           <div class="text">
             <div class="row-between">
               <h3>{{ gen.label }}</h3>
-              <span v-if="isFree && !gen.free" class="badge badge-red"><Lock :size="11" /> Pro</span>
+              <span v-if="isLocked(gen)" class="badge badge-red"><Lock :size="11" /> {{ tierLabels[gen.minTier] }}</span>
               <span v-else class="badge">{{ gen.cost }} tokens</span>
             </div>
             <p class="muted">{{ gen.description }}</p>

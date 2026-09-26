@@ -41,5 +41,6 @@ class CharacterOrchestrator(
 
     fun deleteCharacter(id: Long) = characterService.delete(id)
 
-    fun listCharacters(): List<CharacterResponse> = characterService.listAll()
+    /** Every character in the user's campaigns. */
+    fun listCharacters(userId: Long): List<CharacterResponse> = characterService.listForUser(userId)
 }

@@ -1,21 +1,26 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { CalendarDays, ChevronDown, ClipboardPen, Lock, Sparkles } from 'lucide-vue-next'
+import { CalendarDays, CircleCheck, ChevronDown, ClipboardPen, Lock, RefreshCw, RotateCcw, Sparkles, Trash2 } from 'lucide-vue-next'
 import AppModal from './AppModal.vue'
 import MarkdownView from './MarkdownView.vue'
 import GenerationError from './GenerationError.vue'
+import GenerationOverlay from './GenerationOverlay.vue'
 import { sessionApi } from '../services/api'
 import { useSession } from '../stores/session'
+import { useAccess } from '../stores/access'
 
 /**
  * The sessions of a campaign: each session's plan, what actually happened
- * (the debrief), and generating the next session from it.
+ * (the debrief), adding a session after the last one, and rewriting sessions
+ * that have not been played yet.
  */
 const props = defineProps({ memory: { type: Object, required: true } })
 const emit = defineEmits(['changed'])
-const { isFree, refreshBalance } = useSession()
+const { refreshBalance } = useSession()
+const { hasTier, guard } = useAccess()
 
 const NEXT_SESSION_COST = 25
+const REWRITE_COST = 15
 
 /** The set questions asked after every session. Only the first is required. */
 const questions = [
@@ -33,7 +38,8 @@ const isCampaign = computed(() => props.memory.campaign.kind === 'CAMPAIGN')
 /** Newest first — the session you are about to run or debrief is on top. */
 const sessions = computed(() => [...props.memory.sessions].sort((a, b) => b.sessionNumber - a.sessionNumber))
 const latest = computed(() => sessions.value[0])
-const needsDebrief = computed(() => latest.value && !latest.value.debrief)
+/** The last session is still only a plan, so a new one continues from that plan. */
+const latestUnplayed = computed(() => latest.value && !latest.value.completed)
 
 const openPlans = ref(new Set())
 const debriefing = ref(null)
@@ -41,9 +47,13 @@ const answers = reactive({})
 const saving = ref(false)
 const generating = ref(false)
 const error = ref(null)
+const nextWishes = ref('')
+
+/** The overlay while sessions are being written: finished and total AI calls. */
+const progress = reactive({ done: 0, total: 0, detail: '', title: '' })
 
 function isPlanOpen(session) {
-  return openPlans.value.has(session.id) || (session.id === latest.value?.id && !session.debrief)
+  return openPlans.value.has(session.id) || (session.id === latest.value?.id && !session.completed)
 }
 function togglePlan(session) {
   const next = new Set(openPlans.value)
@@ -71,15 +81,97 @@ async function saveDebrief() {
 }
 
 async function generateNext() {
+  if (!guard('PRO', 'Session planning')) return
+  const number = (latest.value?.sessionNumber ?? 0) + 1
+  Object.assign(progress, { done: 0, total: 1, detail: '', title: `Writing Session ${number}…` })
   generating.value = true
   error.value = null
   try {
-    await sessionApi.next(props.memory.campaign.id)
+    await sessionApi.next(props.memory.campaign.id, nextWishes.value)
+    nextWishes.value = ''
     emit('changed')
   } catch (e) {
     error.value = e
   } finally {
     generating.value = false
+    refreshBalance()
+  }
+}
+
+// --- Completing and deleting sessions ---
+
+const changing = ref(null)
+
+async function setCompleted(session, completed) {
+  changing.value = session.id
+  error.value = null
+  try {
+    await sessionApi.setCompleted(session.id, completed)
+    emit('changed')
+  } catch (e) {
+    error.value = e
+  } finally {
+    changing.value = null
+  }
+}
+
+async function removeSession(session) {
+  const after = props.memory.sessions.some((s) => s.sessionNumber > session.sessionNumber)
+  const note = after ? ' The sessions after it move up one number.' : ''
+  if (!window.confirm(`Delete Session ${session.sessionNumber}, "${session.title}"?${note} This cannot be undone.`)) return
+  changing.value = session.id
+  error.value = null
+  try {
+    await sessionApi.remove(session.id)
+    emit('changed')
+  } catch (e) {
+    error.value = e
+  } finally {
+    changing.value = null
+  }
+}
+
+// --- Rewriting sessions that have not been played yet ---
+
+const rewriting = ref(null)
+const rewriteWishes = ref('')
+const rewriteFollowing = ref(false)
+
+/** Unplayed sessions after the one being rewritten, oldest first. */
+const followingSessions = computed(() => {
+  if (!rewriting.value) return []
+  return props.memory.sessions
+    .filter((s) => s.sessionNumber > rewriting.value.sessionNumber && !s.completed)
+    .sort((a, b) => a.sessionNumber - b.sessionNumber)
+})
+const rewriteTargets = computed(() => (rewriting.value ? [rewriting.value, ...(rewriteFollowing.value ? followingSessions.value : [])] : []))
+
+function openRewrite(session) {
+  if (!guard('PRO', 'Rewriting sessions')) return
+  rewriteWishes.value = ''
+  rewriteFollowing.value = false
+  rewriting.value = session
+}
+
+/** Rewrites the chosen sessions one after another, each building on the one before. */
+async function rewrite() {
+  const targets = rewriteTargets.value
+  rewriting.value = null
+  Object.assign(progress, { done: 0, total: targets.length, title: 'Rewriting your sessions…' })
+  generating.value = true
+  error.value = null
+  try {
+    for (const [index, session] of targets.entries()) {
+      progress.detail = `Session ${session.sessionNumber} (${index + 1} of ${targets.length})`
+      // Only the first session gets the DM's wishes; the ones after follow from it.
+      await sessionApi.rewrite(session.id, index === 0 ? rewriteWishes.value : '')
+      progress.done = index + 1
+    }
+  } catch (e) {
+    error.value = e
+  } finally {
+    generating.value = false
+    emit('changed')
     refreshBalance()
   }
 }
@@ -89,18 +181,19 @@ async function generateNext() {
   <div class="stack">
     <div v-if="isCampaign" class="card next">
       <div>
-        <h3>Next session</h3>
+        <h3>Add a session</h3>
         <p class="muted small">
           Builds on your campaign's idea, everything it remembers, and your notes on what happened last time.
         </p>
-        <p v-if="needsDebrief" class="muted small next-hint">
-          First add notes about <strong>Session {{ latest.sessionNumber }}</strong> — the next session continues from them.
+        <p v-if="latestUnplayed" class="muted small next-hint">
+          <strong>Session {{ latest.sessionNumber }}</strong> hasn't been played yet, so the new session continues from its plan —
+          handy for making the campaign longer. Played it already? <a href="#" @click.prevent="openDebrief(latest)">Add your notes first</a>.
         </p>
+        <input v-model="nextWishes" class="input wishes" placeholder="Anything you want in it? (optional)" />
       </div>
-      <button v-if="isFree" class="btn btn-secondary" disabled><Lock :size="14" /> Pro</button>
-      <button v-else class="btn btn-ai" :disabled="generating || needsDebrief" @click="generateNext">
-        <span v-if="generating" class="spinner" /><Sparkles v-else :size="16" />
-        {{ generating ? 'Planning the next session…' : `Generate Session ${(latest?.sessionNumber ?? 0) + 1} · ${NEXT_SESSION_COST} tokens` }}
+      <button class="btn btn-ai" :class="{ 'is-locked': !hasTier('PRO') }" :disabled="generating" @click="generateNext">
+        <Lock v-if="!hasTier('PRO')" :size="14" /><Sparkles v-else :size="16" />
+        Generate Session {{ (latest?.sessionNumber ?? 0) + 1 }} · {{ NEXT_SESSION_COST }} tokens
       </button>
     </div>
 
@@ -117,9 +210,18 @@ async function generateNext() {
             <span v-if="session.date" class="muted small"><CalendarDays :size="12" /> {{ session.date }}</span>
           </div>
         </div>
-        <span class="badge" :class="session.debrief ? 'badge-green' : 'badge-blue'">
-          {{ session.debrief ? 'Played' : 'Planned' }}
-        </span>
+        <div class="row head-actions">
+          <span class="badge" :class="session.completed ? 'badge-green' : 'badge-blue'">
+            {{ session.completed ? 'Completed' : 'Planned' }}
+          </span>
+          <button
+            class="btn btn-ghost btn-sm delete" :disabled="changing === session.id"
+            :title="`Delete Session ${session.sessionNumber}`" :aria-label="`Delete Session ${session.sessionNumber}`"
+            @click="removeSession(session)"
+          >
+            <Trash2 :size="14" />
+          </button>
+        </div>
       </div>
 
       <div v-if="session.debrief" class="block happened">
@@ -134,9 +236,23 @@ async function generateNext() {
         <span class="block-title">Summary</span>
         <MarkdownView :source="session.summary" />
       </div>
-      <button v-if="!session.debrief" class="btn btn-primary add-notes" @click="openDebrief(session)">
-        <ClipboardPen :size="16" /> Add notes on what happened
-      </button>
+      <div v-if="!session.debrief" class="row session-actions">
+        <button class="btn btn-primary" @click="openDebrief(session)">
+          <ClipboardPen :size="16" /> Add notes on what happened
+        </button>
+        <button v-if="!session.completed" class="btn btn-secondary" :disabled="changing === session.id" @click="setCompleted(session, true)">
+          <CircleCheck :size="16" /> Mark as completed
+        </button>
+        <button v-else class="btn btn-ghost" :disabled="changing === session.id" @click="setCompleted(session, false)">
+          <RotateCcw :size="16" /> Not played yet
+        </button>
+        <button
+          v-if="isCampaign && !session.completed" class="btn btn-secondary" :class="{ 'is-locked': !hasTier('PRO') }"
+          :disabled="generating" @click="openRewrite(session)"
+        >
+          <Lock v-if="!hasTier('PRO')" :size="14" /><RefreshCw v-else :size="16" /> Rewrite · {{ REWRITE_COST }} tokens
+        </button>
+      </div>
 
       <div v-if="session.notes" class="block">
         <button class="plan-toggle" @click="togglePlan(session)">
@@ -146,6 +262,47 @@ async function generateNext() {
         <MarkdownView v-if="isPlanOpen(session)" :source="session.notes" class="plan" />
       </div>
     </article>
+
+    <AppModal
+      v-if="rewriting"
+      :title="`Rewrite Session ${rewriting.sessionNumber}`"
+      subtitle="A new plan for this session that fits everything before it. Sessions you have played are never changed."
+      @close="rewriting = null"
+    >
+      <form class="stack" @submit.prevent="rewrite">
+        <div class="field">
+          <label for="r-wishes">What should change? <span class="muted">(optional)</span></label>
+          <textarea
+            id="r-wishes" v-model="rewriteWishes" class="textarea short"
+            placeholder="The party spared the necromancer — make her an uneasy ally. Less combat, more intrigue."
+          />
+          <span class="hint">Tip: add notes to the sessions you played first — the rewrite builds on them.</span>
+        </div>
+        <label v-if="followingSessions.length" class="check">
+          <input v-model="rewriteFollowing" type="checkbox" />
+          Also rewrite the {{ followingSessions.length }} planned {{ followingSessions.length === 1 ? 'session' : 'sessions' }} after it,
+          so the story stays connected
+        </label>
+        <div class="row actions">
+          <button type="button" class="btn btn-ghost" @click="rewriting = null">Cancel</button>
+          <button class="btn btn-ai">
+            <RefreshCw :size="16" />
+            Rewrite {{ rewriteTargets.length }} {{ rewriteTargets.length === 1 ? 'session' : 'sessions' }} · {{ rewriteTargets.length * REWRITE_COST }} tokens
+          </button>
+        </div>
+      </form>
+    </AppModal>
+
+    <GenerationOverlay
+      :active="generating"
+      :failed="!!error"
+      :expected-seconds="25"
+      :title="progress.title"
+      :steps-done="progress.done"
+      :steps-total="progress.total"
+      :detail="progress.detail"
+      :idea="memory.campaign.description"
+    />
 
     <AppModal
       v-if="debriefing"
@@ -189,7 +346,13 @@ async function generateNext() {
 .block-head { margin-bottom: 4px; }
 .block-title { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
 .happened { background: var(--success-soft); border: none; border-radius: var(--radius-sm); padding: 12px 14px; }
-.add-notes { align-self: flex-start; }
+.session-actions { flex-wrap: wrap; }
+.head-actions { gap: 4px; flex-shrink: 0; }
+.delete { color: var(--text-muted); }
+.delete:hover:not(:disabled) { color: var(--accent-text); }
+.wishes { margin-top: 10px; max-width: 460px; }
+.check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; line-height: 1.45; }
+.check input { margin-top: 3px; }
 .plan-toggle { display: flex; align-items: center; gap: 6px; border: none; background: none; padding: 0; cursor: pointer; color: var(--text-muted); font: inherit; }
 .plan-toggle svg { transition: transform 0.15s; }
 .plan-toggle .turned { transform: rotate(-90deg); }

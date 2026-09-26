@@ -2,6 +2,7 @@ package com.dndsaas.controller
 
 import com.dndsaas.dto.CampaignGenerationRequest
 import com.dndsaas.dto.CampaignGenerationResult
+import com.dndsaas.dto.CampaignJobResponse
 import com.dndsaas.domain.CampaignKind
 import com.dndsaas.dto.SavedIdeaResponse
 import com.dndsaas.dto.CampaignInterviewRequest
@@ -16,7 +17,6 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -45,7 +45,7 @@ class CampaignGeneratorController(
             "and saves it to the account for reuse. Costs 5 tokens.",
     )
     fun suggestIdea(
-        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @CurrentUser userId: Long,
         @RequestBody request: CampaignInterviewRequest,
     ): ResponseEntity<SavedIdeaResponse> =
         ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.suggestIdea(userId, request))
@@ -53,7 +53,7 @@ class CampaignGeneratorController(
     @GetMapping("/ideas")
     @Operation(summary = "List the caller's saved ideas, newest first (optionally ?kind=ONE_SHOT or CAMPAIGN)")
     fun savedIdeas(
-        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @CurrentUser userId: Long,
         @RequestParam(required = false) kind: CampaignKind?,
     ): List<SavedIdeaResponse> =
         orchestrator.savedIdeas(userId, kind)
@@ -61,7 +61,7 @@ class CampaignGeneratorController(
     @DeleteMapping("/ideas/{ideaId}")
     @Operation(summary = "Delete one of the caller's saved ideas")
     fun deleteIdea(
-        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @CurrentUser userId: Long,
         @PathVariable ideaId: Long,
     ): ResponseEntity<Void> {
         orchestrator.deleteIdea(userId, ideaId)
@@ -74,7 +74,7 @@ class CampaignGeneratorController(
         description = "Returns tailored questions with suggested answers. Nothing is saved yet.",
     )
     fun interview(
-        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @CurrentUser userId: Long,
         @RequestBody request: CampaignInterviewRequest,
     ): CampaignInterviewResponse =
         orchestrator.interview(userId, request)
@@ -86,10 +86,30 @@ class CampaignGeneratorController(
             "and a ready-to-run first session — all saved as structured Campaign Memory.",
     )
     fun generate(
-        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @CurrentUser userId: Long,
         @RequestBody request: CampaignGenerationRequest,
     ): ResponseEntity<CampaignGenerationResult> =
         ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.generate(userId, request))
+
+    @PostMapping("/full")
+    @Operation(
+        summary = "Generate a campaign with all its sessions (Pro+)",
+        description = "Send the same body as /generate plus `sessionCount` (2-30). Costs 50 + 25 per session after the first, " +
+            "minus 25 for every 5 sessions, charged when it is done. Runs in the background: poll /jobs/{id}.",
+    )
+    fun generateFull(
+        @CurrentUser userId: Long,
+        @RequestBody request: CampaignGenerationRequest,
+    ): ResponseEntity<CampaignJobResponse> =
+        ResponseEntity.status(HttpStatus.ACCEPTED).body(orchestrator.startFullCampaign(userId, request))
+
+    @GetMapping("/jobs/{jobId}")
+    @Operation(summary = "Progress of a campaign being generated with all its sessions")
+    fun fullStatus(
+        @CurrentUser userId: Long,
+        @PathVariable jobId: String,
+    ): CampaignJobResponse =
+        orchestrator.fullCampaignStatus(userId, jobId)
 
     @PostMapping("/one-shot")
     @Operation(
@@ -98,7 +118,7 @@ class CampaignGeneratorController(
             "saved as a campaign and structured Campaign Memory.",
     )
     fun generateOneShot(
-        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @CurrentUser userId: Long,
         @RequestBody request: CampaignGenerationRequest,
     ): ResponseEntity<CampaignGenerationResult> =
         ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.generateOneShot(userId, request))

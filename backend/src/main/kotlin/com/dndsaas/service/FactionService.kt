@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional
 class FactionService(
+    private val memoryReferences: MemoryReferences,
     private val factionRepository: FactionRepository,
     private val locationService: LocationService,
 ) {
@@ -38,7 +39,10 @@ class FactionService(
     fun listByCampaign(campaignId: Long): List<FactionResponse> =
         factionRepository.findByCampaignIdOrderByNameAsc(campaignId).map(::toResponse)
 
-    fun delete(id: Long) = factionRepository.deleteById(id)
+    fun delete(id: Long) {
+        memoryReferences.detachFaction(id)
+        factionRepository.deleteById(id)
+    }
 
     fun findEntity(id: Long): Faction =
         factionRepository.findById(id)

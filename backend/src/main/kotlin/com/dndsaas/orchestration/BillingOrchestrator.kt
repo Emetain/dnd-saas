@@ -11,7 +11,6 @@ import com.dndsaas.dto.SubscriptionDetailsResponse
 import com.dndsaas.dto.TokenBalanceResponse
 import com.dndsaas.dto.TokenEarnedResponse
 import com.dndsaas.dto.UserResponse
-import com.dndsaas.dto.UserRegistrationRequest
 import com.dndsaas.service.AlreadySubscribedException
 import com.dndsaas.service.AppReviewService
 import com.dndsaas.service.FreeTierEarningService
@@ -49,9 +48,6 @@ class BillingOrchestrator(
     }
 
     // -------- User Registration & Account --------
-
-    fun registerUser(request: UserRegistrationRequest): UserResponse =
-        userService.register(request)
 
     fun getUserAccount(userId: Long): UserResponse =
         userService.get(userId)

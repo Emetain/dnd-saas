@@ -4,7 +4,7 @@ import AppModal from './AppModal.vue'
 import UpgradePrompt from './UpgradePrompt.vue'
 import ModuleGenerator from '../views/generators/ModuleGenerator.vue'
 import { findGenerator } from '../data/generators'
-import { useSession } from '../stores/session'
+import { useAccess } from '../stores/access'
 
 /** Runs one generator for one campaign in a pop-up, without leaving the campaign page. */
 const props = defineProps({
@@ -12,7 +12,7 @@ const props = defineProps({
   campaignId: { type: Number, required: true },
 })
 const emit = defineEmits(['close', 'generated'])
-const { isFree } = useSession()
+const { isLocked } = useAccess()
 
 const generator = computed(() => findGenerator(props.slug))
 </script>
@@ -24,7 +24,7 @@ const generator = computed(() => findGenerator(props.slug))
     wide
     @close="emit('close')"
   >
-    <UpgradePrompt v-if="isFree && !generator.free" :feature="generator.label" />
+    <UpgradePrompt v-if="isLocked(generator)" :feature="generator.label" :tier="generator.minTier" />
     <ModuleGenerator v-else :generator="generator" :fixed-campaign-id="campaignId" @generated="emit('generated', $event)" />
   </AppModal>
 </template>

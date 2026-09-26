@@ -1,25 +1,30 @@
 <script setup>
-import { Castle, Flag, MessageCircleQuestion, Sparkles } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { Check } from 'lucide-vue-next'
+import { findPlan } from '../data/plans'
+import { tierLabels } from '../stores/session'
 
-defineProps({ feature: { type: String, required: true } })
+/** Shown in place of a generator the user's plan doesn't include (e.g. when opened by URL). */
+const props = defineProps({
+  feature: { type: String, required: true },
+  /** The lowest plan that includes the feature. */
+  tier: { type: String, default: 'PRO' },
+})
+
+const plan = computed(() => findPlan(props.tier))
+const planName = computed(() => tierLabels[props.tier])
 </script>
 
 <template>
   <div class="card upgrade">
-    <span class="badge badge-red">Pro feature</span>
-    <h2>{{ feature }} is part of Pro</h2>
-    <p class="muted">
-      On Free you can generate one-shots and run every adventure generator inside them.
-      Pro unlocks full campaigns and the tools that make a large world hang together.
-    </p>
+    <span class="badge badge-red">{{ planName }} feature</span>
+    <h2>{{ feature }} is part of {{ planName }}</h2>
+    <p class="muted">Upgrade to {{ planName }} ({{ plan.price }} / month) to use it. You also get:</p>
     <ul>
-      <li><Castle :size="16" /> The campaign generator — lore, locations, factions, NPCs, quests and Session 1</li>
-      <li><Flag :size="16" /> Factions to connect your world</li>
-      <li><MessageCircleQuestion :size="16" /> Free-form questions about your campaign</li>
-      <li><Sparkles :size="16" /> 1,000 tokens every month, rolling over up to 2,000</li>
+      <li v-for="item in plan.features" :key="item"><Check :size="16" /> {{ item }}</li>
     </ul>
     <div class="row">
-      <RouterLink to="/billing#plans" class="btn btn-accent">See plans</RouterLink>
+      <RouterLink to="/billing#plans" class="btn btn-accent">Upgrade to {{ planName }}</RouterLink>
       <RouterLink to="/generators/one-shot" class="btn btn-secondary">Make a one-shot instead</RouterLink>
     </div>
   </div>

@@ -42,9 +42,6 @@ class CampaignService(
     fun get(id: Long): CampaignResponse = toResponse(findEntity(id))
 
     @Transactional(readOnly = true)
-    fun list(): List<CampaignResponse> = campaignRepository.findAll().map(::toResponse)
-
-    @Transactional(readOnly = true)
     fun listForUser(userId: Long): List<CampaignResponse> =
         campaignRepository.findByUserIdOrderByUpdatedAtDesc(userId).map(::toResponse)
 

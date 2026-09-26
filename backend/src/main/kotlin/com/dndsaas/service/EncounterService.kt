@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional
 class EncounterService(
+    private val memoryReferences: MemoryReferences,
     private val encounterRepository: EncounterRepository,
     private val characterRepository: CharacterRepository,
     private val calculationService: EncounterCalculationService,
@@ -54,7 +55,10 @@ class EncounterService(
     fun listBySession(sessionId: Long): List<EncounterResponse> =
         encounterRepository.findBySessionIdOrderByTitleAsc(sessionId).map(::toResponse)
 
-    fun delete(id: Long) = encounterRepository.deleteById(id)
+    fun delete(id: Long) {
+        memoryReferences.detachEncounter(id)
+        encounterRepository.deleteById(id)
+    }
 
     fun findEntity(id: Long): Encounter =
         encounterRepository.findById(id)

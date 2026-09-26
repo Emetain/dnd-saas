@@ -14,12 +14,14 @@ import com.stripe.model.Customer
 import com.stripe.model.Event
 import com.stripe.model.Invoice
 import com.stripe.model.Price
+import com.stripe.model.Product
 import com.stripe.model.Subscription
 import com.stripe.model.billingportal.Configuration
 import com.stripe.net.Webhook
 import com.stripe.param.CustomerCreateParams
 import com.stripe.param.PriceCreateParams
 import com.stripe.param.PriceListParams
+import com.stripe.param.ProductUpdateParams
 import com.stripe.param.billingportal.ConfigurationCreateParams
 import com.stripe.param.billingportal.ConfigurationListParams
 import com.stripe.param.checkout.SessionCreateParams
@@ -224,16 +226,23 @@ class StripeService(
     private fun packPrice(pack: TokenPack) =
         price(packLookupKey(pack), "Narrion ${pack.tokens} token pack", pack.priceEuroCents.toLong(), monthly = false)
 
-    /** Finds a price by its lookup key, creating it (and its product) the first time. */
+    /**
+     * Finds a price by its lookup key, creating it (and its product) the first time.
+     * Products need a tax code for Stripe Managed Payments; older products without
+     * one get it added here.
+     */
     private fun price(lookupKey: String, name: String, amountCents: Long, monthly: Boolean): Price =
         prices.getOrPut(lookupKey) {
             Price.list(PriceListParams.builder().addLookupKey(lookupKey).setActive(true).build()).data.firstOrNull()
+                ?.also(::ensureTaxCode)
                 ?: Price.create(
                     PriceCreateParams.builder()
                         .setLookupKey(lookupKey)
                         .setCurrency("eur")
                         .setUnitAmount(amountCents)
-                        .setProductData(PriceCreateParams.ProductData.builder().setName(name).build())
+                        // The amounts in our enums are what the customer pays, VAT included.
+                        .setTaxBehavior(PriceCreateParams.TaxBehavior.INCLUSIVE)
+                        .setProductData(PriceCreateParams.ProductData.builder().setName(name).setTaxCode(TAX_CODE).build())
                         .apply {
                             if (monthly) {
                                 setRecurring(
@@ -246,6 +255,14 @@ class StripeService(
                         .build(),
                 ).also { log.info("Created Stripe price {} ({})", lookupKey, it.id) }
         }
+
+    private fun ensureTaxCode(price: Price) {
+        val product = Product.retrieve(price.product)
+        if (product.taxCode == null) {
+            product.update(ProductUpdateParams.builder().setTaxCode(TAX_CODE).build())
+            log.info("Set tax code on Stripe product {}", product.id)
+        }
+    }
 
     /** The user's Stripe customer, created on their first checkout. */
     private fun customerId(user: User): String =
@@ -330,6 +347,9 @@ class StripeService(
 
     private companion object {
         const val PORTAL_TAG = "narrion"
+
+        /** "AI as a Service - cloud based - personal use", an eligible Managed Payments tax code. */
+        const val TAX_CODE = "txcd_10105001"
         val ACTIVE_STATUSES = setOf("active", "trialing", "past_due")
     }
 }

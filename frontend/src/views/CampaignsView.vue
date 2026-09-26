@@ -4,10 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { Lock, Plus, Sparkles, X } from 'lucide-vue-next'
 import { campaignApi } from '../services/api'
 import { useSession } from '../stores/session'
+import { useAccess } from '../stores/access'
 import CampaignCard from '../components/CampaignCard.vue'
 import { gameSystems } from '../data/campaignOptions'
 
 const { isFree } = useSession()
+const { guard } = useAccess()
 const route = useRoute()
 const router = useRouter()
 
@@ -76,13 +78,10 @@ onMounted(load)
       <form class="stack" @submit.prevent="create">
         <div class="segmented">
           <button type="button" :class="{ active: form.kind === 'ONE_SHOT' }" @click="form.kind = 'ONE_SHOT'">One-shot</button>
-          <button type="button" :class="{ active: form.kind === 'CAMPAIGN' }" :disabled="isFree" @click="form.kind = 'CAMPAIGN'">
+          <button type="button" :class="{ active: form.kind === 'CAMPAIGN', 'is-locked': isFree }" @click="guard('PRO', 'Campaigns') && (form.kind = 'CAMPAIGN')">
             <Lock v-if="isFree" :size="12" /> Campaign
           </button>
         </div>
-        <p v-if="isFree" class="muted small">
-          Full campaigns are part of Pro. <RouterLink to="/billing#plans">Compare plans</RouterLink>
-        </p>
         <div class="grid grid-2">
           <div class="field">
             <label for="c-name">Name</label>

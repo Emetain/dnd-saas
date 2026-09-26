@@ -236,5 +236,5 @@ class TokenService(
 class InsufficientTokensException(val required: Long, val available: Long) :
     RuntimeException("Not enough tokens: this generation costs $required, but only $available are available")
 
-/** Raised when the user's subscription tier does not include a feature. */
-class TierRestrictionException(message: String) : RuntimeException(message)
+/** Raised when the user's subscription tier does not include a feature; [requiredTier] is the lowest plan that does. */
+class TierRestrictionException(message: String, val requiredTier: SubscriptionTier = SubscriptionTier.PRO) : RuntimeException(message)

@@ -3,7 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ArrowRight, Castle, Lock, PlayCircle, ScrollText, Sparkles } from 'lucide-vue-next'
 import { campaignApi } from '../services/api'
 import { useSession } from '../stores/session'
-import { useWelcome } from '../stores/welcome'
+import { useAccess } from '../stores/access'
+import { findGenerator } from '../data/generators'
 import { bannerSlides } from '../data/bannerSlides'
 
 /**
@@ -12,7 +13,7 @@ import { bannerSlides } from '../data/bannerSlides'
  * and the main actions. It scrolls away while the navigation bar stays at the top.
  */
 const { state, isFree } = useSession()
-const { openAccountForm } = useWelcome()
+const { guardGenerator } = useAccess()
 
 // --- Slideshow ---
 const current = ref(0)
@@ -79,11 +80,11 @@ const continueLink = computed(() => {
 
         <div class="actions">
           <!-- Visitors get one clear action; members get the three ways in. -->
-          <button v-if="!state.user" class="btn btn-accent btn-lg" @click="openAccountForm('register')">
+          <RouterLink v-if="!state.user" to="/register" class="btn btn-accent btn-lg">
             <Sparkles :size="18" /> Register now — it's free
-          </button>
+          </RouterLink>
           <template v-else>
-            <RouterLink to="/generators/campaign" class="btn btn-accent btn-lg">
+            <RouterLink to="/generators/campaign" class="btn btn-accent btn-lg" :class="{ 'is-locked': isFree }" @click.capture="guardGenerator($event, findGenerator('campaign'))">
               <Castle :size="18" /> Create a campaign
               <Lock v-if="isFree" :size="14" />
             </RouterLink>

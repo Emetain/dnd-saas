@@ -1,8 +1,18 @@
 <script setup>
+import { watch } from 'vue'
 import { Coins, Lock } from 'lucide-vue-next'
+import { useAccess } from '../stores/access'
 
-/** Explains a failed generation, with a way forward for 402 (tokens) and 403 (tier). */
-defineProps({ error: { type: Object, required: true } })
+/**
+ * Explains a failed generation, with a way forward for 402 (tokens) and 403 (tier).
+ * A 403 also opens the upgrade pop-up for the plan the backend says is needed.
+ */
+const props = defineProps({ error: { type: Object, required: true } })
+const { showUpgrade } = useAccess()
+
+watch(() => props.error, (error) => {
+  if (error?.status === 403 && error.body?.requiredTier) showUpgrade('This feature', error.body.requiredTier)
+}, { immediate: true })
 </script>
 
 <template>

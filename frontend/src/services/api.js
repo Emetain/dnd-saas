@@ -6,10 +6,14 @@
 
 const BASE_URL = '/api/v1'
 
-/** Set by the session store; sent as X-User-Id until real authentication exists. */
-let currentUserId = null
-export function setApiUser(id) {
-  currentUserId = id
+/**
+ * Who is signed in travels in an HttpOnly session cookie that the browser sends
+ * by itself. When the backend answers 401 (signed out or expired), this handler
+ * — set by the session store — takes the user back to sign-in.
+ */
+let onUnauthorized = () => {}
+export function setUnauthorizedHandler(handler) {
+  onUnauthorized = handler
 }
 
 /** An API failure that keeps the HTTP status, so views can react to 402/403. */
@@ -22,10 +26,12 @@ export class ApiError extends Error {
 }
 
 async function request(path, options = {}) {
+  // expectSignedOut: a 401 is a normal answer here (sign-in form, first visit), not a lost session.
+  const { expectSignedOut, ...fetchOptions } = options
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
-  if (currentUserId != null) headers['X-User-Id'] = String(currentUserId)
 
-  const response = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+  const response = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, headers, credentials: 'same-origin' })
+  if (response.status === 401 && !expectSignedOut) onUnauthorized()
   if (!response.ok) {
     let message = `Request failed: ${response.status}`
     let body = null
@@ -46,8 +52,23 @@ async function request(path, options = {}) {
 const post = (path, body) => request(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
 const put = (path, body) => request(path, { method: 'PUT', body: JSON.stringify(body) })
 
+export const authApi = {
+  /** Creates the account and signs in. */
+  register: (form) => post('/auth/register', form),
+  login: (email, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }), expectSignedOut: true }),
+  logout: () => post('/auth/logout'),
+  /** The signed-in user; 401 when signed out, which is normal on a first visit. */
+  me: () => request('/auth/me', { expectSignedOut: true }),
+  updateProfile: (displayName) => put('/auth/me', { displayName }),
+  changePassword: (currentPassword, newPassword) => put('/auth/password', { currentPassword, newPassword }),
+  verifyEmail: (token) => post('/auth/verify-email', { token }),
+  resendVerification: () => post('/auth/resend-verification'),
+  /** Always succeeds, whether or not the address has an account. */
+  forgotPassword: (email) => post('/auth/forgot-password', { email }),
+  resetPassword: (token, newPassword) => post('/auth/reset-password', { token, newPassword }),
+}
+
 export const userApi = {
-  register: (user) => post('/users/register', user),
   get: (id) => request(`/users/${id}`),
 }
 
@@ -99,11 +120,23 @@ export const characterApi = {
   remove: (id) => request(`/characters/${id}`, { method: 'DELETE' }),
 }
 
+/** Anything in Campaign Memory addressable as /{resource}/{id}: npcs, locations, quests, items, … */
+export const memoryApi = {
+  create: (campaignId, resource, body) => post(`/campaigns/${campaignId}/${resource}`, body),
+  update: (resource, id, body) => put(`/${resource}/${id}`, body),
+  remove: (resource, id) => request(`/${resource}/${id}`, { method: 'DELETE' }),
+}
+
 export const sessionApi = {
   /** Record what happened in a session (the post-session questions). */
   saveDebrief: (sessionId, debrief) => put(`/sessions/${sessionId}/debrief`, debrief),
   /** Generate the next session of a campaign (25 tokens). */
-  next: (campaignId) => post(`/campaigns/${campaignId}/sessions/next`, {}),
+  next: (campaignId, wishes = '') => post(`/campaigns/${campaignId}/sessions/next`, { wishes }),
+  /** Re-plan a session that has not been played yet (15 tokens). */
+  rewrite: (sessionId, wishes = '') => post(`/sessions/${sessionId}/rewrite`, { wishes }),
+  setCompleted: (sessionId, completed) => put(`/sessions/${sessionId}/completed`, { completed }),
+  /** Deletes a session; the sessions after it move up one number. */
+  remove: (sessionId) => request(`/sessions/${sessionId}`, { method: 'DELETE' }),
 }
 
 export const generatorApi = {
@@ -123,6 +156,9 @@ export const campaignGeneratorApi = {
   interview: (body) => post('/ai/campaign-generator/interview', body),
   generate: (body) => post('/ai/campaign-generator/generate', body),
   oneShot: (body) => post('/ai/campaign-generator/one-shot', body),
+  /** Start a campaign with all its sessions (Pro+); runs in the background, poll with job(). */
+  full: (body) => post('/ai/campaign-generator/full', body),
+  job: (id) => request(`/ai/campaign-generator/jobs/${id}`),
 }
 
 export const aiApi = {

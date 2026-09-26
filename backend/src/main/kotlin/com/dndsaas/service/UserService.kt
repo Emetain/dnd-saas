@@ -5,6 +5,7 @@ import com.dndsaas.domain.SubscriptionTier
 import com.dndsaas.dto.UserResponse
 import com.dndsaas.dto.UserRegistrationRequest
 import com.dndsaas.repository.UserRepository
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional
 class UserService(
     private val userRepository: UserRepository,
+    private val passwordEncoder: PasswordEncoder,
 ) {
 
     /**
@@ -25,20 +27,41 @@ class UserService(
      * New free users start with 50 platform tokens.
      */
     fun register(request: UserRegistrationRequest): UserResponse {
-        if (userRepository.existsByEmail(request.email)) {
-            throw IllegalArgumentException("Email already registered: ${request.email}")
-        }
+        val email = request.email.trim().lowercase()
+        val displayName = request.displayName.trim()
+        require(EMAIL.matches(email)) { "Enter a valid email address" }
+        require(displayName.length in 1..MAX_NAME_LENGTH) { "Choose a display name of 1 to $MAX_NAME_LENGTH characters" }
+        checkPasswordRules(request.password)
+        require(!userRepository.existsByEmailIgnoreCase(email)) { "There is already an account with this email — sign in instead" }
 
         val user = User(
-            email = request.email,
-            displayName = request.displayName,
-            passwordHash = hashPassword(request.password), // TODO: use proper password hashing (bcrypt)
+            email = email,
+            displayName = displayName,
+            passwordHash = passwordEncoder.encode(request.password),
+            emailVerified = false,
             subscriptionTier = SubscriptionTier.FREE,
             allowanceTokens = 50, // Free tier starting tokens
         )
 
         val saved = userRepository.save(user)
         return toResponse(saved)
+    }
+
+    /** At least 8 characters, with a capital letter, a number and a special character. */
+    fun checkPasswordRules(password: String) {
+        require(password.length >= MIN_PASSWORD_LENGTH) { "Choose a password of at least $MIN_PASSWORD_LENGTH characters" }
+        require(password.length <= MAX_PASSWORD_LENGTH) { "That password is too long" }
+        require(password.any(Char::isUpperCase)) { "Add at least one capital letter to your password" }
+        require(password.any(Char::isDigit)) { "Add at least one number to your password" }
+        require(password.any { it in SPECIAL_CHARACTERS }) { "Add at least one of these special characters: $SPECIAL_CHARACTERS" }
+    }
+
+    fun updateDisplayName(userId: Long, displayName: String): UserResponse {
+        val name = displayName.trim()
+        require(name.length in 1..MAX_NAME_LENGTH) { "Choose a display name of 1 to $MAX_NAME_LENGTH characters" }
+        val user = findEntity(userId)
+        user.displayName = name
+        return toResponse(userRepository.save(user))
     }
 
     /**
@@ -79,11 +102,19 @@ class UserService(
             allowanceTokens = user.allowanceTokens,
             purchasedTokens = user.purchasedTokens,
             createdAt = user.createdAt,
+            emailVerified = user.emailVerified,
         )
 
-    private fun hashPassword(password: String): String {
-        // TODO: Replace with proper bcrypt hashing
-        return password // Placeholder
+    private companion object {
+        val EMAIL = Regex("""^[^@\s]+@[^@\s]+\.[^@\s]+$""")
+        const val MAX_NAME_LENGTH = 50
+        const val MIN_PASSWORD_LENGTH = 8
+
+        /** The characters that count as "special" — the frontend lists the same ones (utils/password.js). */
+        const val SPECIAL_CHARACTERS = "!@#$%^&*()-_=+[]{}?.,:;"
+
+        /** BCrypt only looks at the first 72 bytes. */
+        const val MAX_PASSWORD_LENGTH = 72
     }
 }
 

@@ -3,6 +3,19 @@ spring:
     name: dnd-saas
   profiles:
     active: dev
+  # Outgoing email. In development this is Mailpit (docker compose): every email
+  # lands in its inbox at http://localhost:8025 instead of being delivered.
+  # In production point these at a real provider (Postmark, Resend, SES…).
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
 
 server:
   port: 8080
@@ -28,6 +41,14 @@ app:
     base-url: https://api.openai.com/v1
     model: gpt-4o-mini
     timeout-seconds: 60
+  # Sign-in: a random session token in an HttpOnly cookie. Set AUTH_SECURE_COOKIE=true behind HTTPS.
+  auth:
+    # Links in emails (verify, reset password) point here.
+    base-url: ${APP_BASE_URL:http://localhost:5173}
+    mail-from: ${MAIL_FROM:Narrion <no-reply@narrion.local>}
+    cookie-name: narrion_session
+    secure-cookie: ${AUTH_SECURE_COOKIE:false}
+    session-days: 30
   # Payments. Without STRIPE_SECRET_KEY, payments are off and plan changes are free (testing).
   stripe:
     secret-key: ${STRIPE_SECRET_KEY:}

@@ -24,14 +24,6 @@ class UserController(
     private val billingOrchestrator: BillingOrchestrator,
 ) {
 
-    @PostMapping("/register")
-    @Operation(
-        summary = "Register a new user account",
-        description = "Creates a new user account. Free tier users start with 50 tokens.",
-    )
-    fun register(@RequestBody request: UserRegistrationRequest): ResponseEntity<UserResponse> =
-        ResponseEntity.status(HttpStatus.CREATED).body(billingOrchestrator.registerUser(request))
-
     @GetMapping("/{userId}")
     @Operation(
         summary = "Get user account information",

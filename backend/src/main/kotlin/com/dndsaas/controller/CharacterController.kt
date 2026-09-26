@@ -61,6 +61,6 @@ class CharacterController(
     }
 
     @GetMapping("/characters")
-    @Operation(summary = "List all characters across campaigns")
-    fun list(): List<CharacterResponse> = orchestrator.listCharacters()
+    @Operation(summary = "List the characters in all of the signed-in user's campaigns")
+    fun list(@CurrentUser userId: Long): List<CharacterResponse> = orchestrator.listCharacters(userId)
 }

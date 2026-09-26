@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional
 class QuestService(
+    private val memoryReferences: MemoryReferences,
     private val questRepository: QuestRepository,
     private val npcService: NpcService,
     private val locationService: LocationService,
@@ -60,7 +61,10 @@ class QuestService(
             .filter { quest -> quest.questGiver?.id == npcId || quest.involvedNpcs.any { it.id == npcId } }
             .map(::toResponse)
 
-    fun delete(id: Long) = questRepository.deleteById(id)
+    fun delete(id: Long) {
+        memoryReferences.detachQuest(id)
+        questRepository.deleteById(id)
+    }
 
     fun findEntity(id: Long): Quest =
         questRepository.findById(id)

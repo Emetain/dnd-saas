@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Check, Coins, Info } from 'lucide-vue-next'
 import { paymentApi, subscriptionApi, tokenApi } from '../services/api'
 import { tierLabels, useSession } from '../stores/session'
+import { MOST_POPULAR, plans, tierOrder } from '../data/plans'
 
 const { state, refreshBalance } = useSession()
 const route = useRoute()
@@ -18,32 +19,11 @@ const busy = ref('')
 const message = ref('')
 const error = ref('')
 
-const tierOrder = ['FREE', 'PRO', 'PRO_PLUS', 'ULTIMATE_DM']
-/** Highlighted on the plans page. */
-const MOST_POPULAR = 'PRO_PLUS'
-const plans = [
-  {
-    tier: 'FREE', price: '€0', tokens: '50 to start',
-    features: ['One-shots', 'NPC, Boss, Backstory, Quest, Encounter, Loot, Shop and Puzzle generators', 'Earn tokens with ads and referrals', 'Buy token packs'],
-  },
-  {
-    tier: 'PRO', price: '€10', tokens: '1,000 / month',
-    features: ['Everything in Free', 'Full campaign generator', 'Factions and full Campaign Memory', 'Free-form questions', 'Unused tokens roll over up to 2,000'],
-  },
-  {
-    tier: 'PRO_PLUS', price: '€25', tokens: '3,000 / month',
-    features: ['Everything in Pro', 'Rolls over up to 6,000'],
-  },
-  {
-    tier: 'ULTIMATE_DM', price: '€50', tokens: '5,000 / month',
-    features: ['Everything in Pro+', 'Image and map generation (coming soon)', 'Rolls over up to 10,000'],
-  },
-]
 /** Mirrors TokenPack on the backend. */
 const packs = [
-  { pack: 'SMALL', tokens: 250, price: '€5' },
-  { pack: 'MEDIUM', tokens: 1000, price: '€15', badge: 'Popular' },
-  { pack: 'LARGE', tokens: 2500, price: '€25', badge: 'Best value' },
+  { pack: 'SMALL', tokens: 250, price: '€4.99' },
+  { pack: 'MEDIUM', tokens: 1000, price: '€14.99', badge: 'Popular' },
+  { pack: 'LARGE', tokens: 2500, price: '€24.99', badge: 'Best value' },
 ]
 
 const currentTier = computed(() => state.user.subscriptionTier)

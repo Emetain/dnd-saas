@@ -27,6 +27,10 @@ class User(
     @Column(nullable = false)
     var passwordHash: String = "",
 
+    /** Whether the user clicked the link in the verification email. Accounts from before verification count as verified. */
+    @Column(nullable = false, columnDefinition = "boolean not null default true")
+    var emailVerified: Boolean = true,
+
     /** Current subscription tier. */
     @Enumerated(EnumType.STRING)
     var subscriptionTier: SubscriptionTier = SubscriptionTier.FREE,

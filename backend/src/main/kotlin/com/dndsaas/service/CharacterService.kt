@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional
 class CharacterService(
+    private val memoryReferences: MemoryReferences,
     private val characterRepository: CharacterRepository,
     private val calculationService: CharacterCalculationService,
 ) {
@@ -43,9 +44,13 @@ class CharacterService(
         characterRepository.findByCampaignIdOrderByNameAsc(campaignId).map(::toResponse)
 
     @Transactional(readOnly = true)
-    fun listAll(): List<CharacterResponse> = characterRepository.findAll().map(::toResponse)
+    fun listForUser(userId: Long): List<CharacterResponse> =
+        characterRepository.findByCampaignUserIdOrderByNameAsc(userId).map(::toResponse)
 
-    fun delete(id: Long) = characterRepository.deleteById(id)
+    fun delete(id: Long) {
+        memoryReferences.detachCharacter(id)
+        characterRepository.deleteById(id)
+    }
 
     /** Sets a character's backstory directly — used by the backstory generator. */
     fun updateBackstory(id: Long, backstory: String): CharacterResponse {

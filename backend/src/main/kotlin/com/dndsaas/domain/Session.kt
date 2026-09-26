@@ -40,5 +40,12 @@ class Session(
      */
     @Column(columnDefinition = "TEXT")
     var debrief: String? = null,
-) : BaseEntity()
+
+    /** The session has been played — set by hand, or automatically when a debrief is saved. */
+    @Column(nullable = false, columnDefinition = "boolean not null default false")
+    var completed: Boolean = false,
+) : BaseEntity() {
+    /** Played sessions are history: they are never rewritten, and later sessions build on them. */
+    val isPlayed: Boolean get() = completed || !debrief.isNullOrBlank()
+}
 

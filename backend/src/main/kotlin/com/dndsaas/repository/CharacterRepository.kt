@@ -14,4 +14,6 @@ interface CharacterRepository : JpaRepository<Character, Long> {
     fun findByCampaignIdOrderByNameAsc(campaignId: Long): List<Character>
 
     fun countByCampaignId(campaignId: Long): Long
+
+    fun findByCampaignUserIdOrderByNameAsc(userId: Long): List<Character>
 }

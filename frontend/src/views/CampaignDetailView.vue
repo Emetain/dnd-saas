@@ -2,11 +2,15 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  BookOpen, Flag, Gem, Lock, MapPin, Plus, ScrollText, Sparkles, Store, Swords, Trash2, UserRound, Users, CalendarDays,
+  BookOpen, Pencil, Flag, Gem, Lock, MapPin, Plus, ScrollText, Sparkles, Store, Swords, Trash2, UserRound, Users, CalendarDays,
 } from 'lucide-vue-next'
 import { campaignApi, characterApi } from '../services/api'
 import { useSession } from '../stores/session'
+import { useAccess } from '../stores/access'
 import MemoryList from '../components/MemoryList.vue'
+import AppModal from '../components/AppModal.vue'
+import MemoryEditor from '../components/MemoryEditor.vue'
+import { memoryForms } from '../data/memoryForms'
 import CharacterForm from '../components/CharacterForm.vue'
 import NavDropdown from '../components/NavDropdown.vue'
 import GenerateModal from '../components/GenerateModal.vue'
@@ -16,6 +20,7 @@ import { findGenerator, generatorGroups } from '../data/generators'
 
 const props = defineProps({ id: { type: String, required: true } })
 const { isFree } = useSession()
+const { isLocked, guard } = useAccess()
 const router = useRouter()
 const route = useRoute()
 
@@ -39,6 +44,11 @@ const tabGenerators = {
   shops: ['shop'],
   characters: ['backstory'],
 }
+/** Opens a generator in a pop-up, or the upgrade pop-up if the plan doesn't include it. */
+function openGenerator(gen) {
+  if (guard(gen.minTier, gen.label)) generating.value = gen.slug
+}
+
 const currentGenerators = computed(() => (tabGenerators[tab.value] || []).map(findGenerator))
 
 const moduleGroups = generatorGroups
@@ -76,6 +86,48 @@ async function addCharacter(character) {
   await load()
 }
 
+// --- Adding and editing NPCs, locations, quests and items by hand ---
+
+/** { resource, item } while the editor is open; item is null when adding. */
+const memoryEditor = ref(null)
+const manualResource = computed(() => (memoryForms[tab.value] ? tab.value : null))
+
+function editMemory(resource, item = null) {
+  memoryEditor.value = { resource, item }
+}
+
+async function memorySaved() {
+  memoryEditor.value = null
+  await load()
+}
+
+// --- Editing the campaign's name, pitch and lore ---
+
+const editing = ref(null)
+const savingEdit = ref(false)
+const editError = ref('')
+
+function openEdit() {
+  const c = memory.value.campaign
+  editing.value = { name: c.name, description: c.description, worldLore: c.worldLore }
+  editError.value = ''
+}
+
+async function saveEdit() {
+  const c = memory.value.campaign
+  savingEdit.value = true
+  editError.value = ''
+  try {
+    await campaignApi.update(c.id, { ...editing.value, system: c.system, kind: c.kind })
+    editing.value = null
+    await load()
+  } catch (e) {
+    editError.value = e.message
+  } finally {
+    savingEdit.value = false
+  }
+}
+
 async function removeCampaign() {
   if (!window.confirm(`Delete "${memory.value.campaign.name}" and everything it remembers? This cannot be undone.`)) return
   await campaignApi.remove(props.id)
@@ -110,20 +162,22 @@ onMounted(load)
                 v-for="gen in group.generators"
                 :key="gen.slug"
                 class="gen-item"
-                @click="generating = gen.slug"
+                :class="{ 'is-locked': isLocked(gen) }"
+                @click="openGenerator(gen)"
               >
                 <component :is="gen.icon" :size="15" /> {{ gen.label }}
                 <span class="muted small cost">{{ gen.cost }}</span>
-                <Lock v-if="isFree && !gen.free" :size="12" class="lock" />
+                <Lock v-if="isLocked(gen)" :size="12" class="lock" />
               </button>
             </div>
           </NavDropdown>
-          <button class="btn btn-ghost" title="Delete campaign" @click="removeCampaign"><Trash2 :size="16" /></button>
+          <button class="btn btn-ghost" title="Edit name, pitch and lore" aria-label="Edit campaign" @click="openEdit"><Pencil :size="16" /></button>
+          <button class="btn btn-ghost" title="Delete campaign" aria-label="Delete campaign" @click="removeCampaign"><Trash2 :size="16" /></button>
         </div>
       </div>
 
       <div class="tabs">
-        <button v-for="t in tabs" :key="t.id" :class="{ active: tab === t.id }" @click="tab = t.id">
+        <button v-for="t in tabs" :key="t.id" :class="{ active: tab === t.id, 'is-locked': t.locked }" @click="tab = t.id">
           <component :is="t.icon" :size="15" />
           {{ t.label }}
           <span v-if="t.count != null" class="badge">{{ t.count }}</span>
@@ -131,15 +185,18 @@ onMounted(load)
         </button>
       </div>
 
-      <div v-if="currentGenerators.length" class="tab-actions">
+      <div v-if="currentGenerators.length || manualResource" class="tab-actions">
+        <button v-if="manualResource" class="btn btn-sm btn-secondary" @click="editMemory(manualResource)">
+          <Plus :size="14" /> Add {{ memoryForms[manualResource].singular }}
+        </button>
         <button
           v-for="gen in currentGenerators" :key="gen.slug"
-          class="btn btn-sm" :class="gen === currentGenerators[0] ? 'btn-ai' : 'btn-secondary'"
-          @click="generating = gen.slug"
+          class="btn btn-sm" :class="[gen === currentGenerators[0] ? 'btn-ai' : 'btn-secondary', { 'is-locked': isLocked(gen) }]"
+          @click="openGenerator(gen)"
         >
           <Sparkles :size="14" /> Generate {{ gen.label }}
           <span class="cost-chip">{{ gen.cost }}</span>
-          <Lock v-if="isFree && !gen.free" :size="12" />
+          <Lock v-if="isLocked(gen)" :size="12" />
         </button>
       </div>
 
@@ -167,12 +224,12 @@ onMounted(load)
       </section>
 
       <MemoryList
-        v-else-if="tab === 'npcs'" :items="memory.npcs" :tag-keys="['role', 'race', 'occupation', 'status']"
+        v-else-if="tab === 'npcs'" :items="memory.npcs" resource="npcs" editable @changed="load" @edit="editMemory('npcs', $event)" :tag-keys="['role', 'race', 'occupation', 'status']"
         :fields="[['personality', 'Personality'], ['motivation', 'Motivation'], ['secret', 'Secret'], ['voice', 'Voice'], ['location', 'Lives in'], ['faction', 'Faction']]"
         empty-text="No NPCs yet — try the NPC generator."
       />
       <MemoryList
-        v-else-if="tab === 'locations'" :items="memory.locations" :tag-keys="['type']"
+        v-else-if="tab === 'locations'" :items="memory.locations" resource="locations" editable @changed="load" @edit="editMemory('locations', $event)" :tag-keys="['type']"
         :fields="[['atmosphere', 'Atmosphere'], ['parent', 'Part of']]" empty-text="No locations yet."
       />
       <template v-else-if="tab === 'factions'">
@@ -181,22 +238,22 @@ onMounted(load)
           <span>Factions are part of Pro — they make large worlds hang together. <RouterLink to="/billing#plans">Compare plans</RouterLink></span>
         </div>
         <MemoryList
-          :items="memory.factions" :tag-keys="['type', 'status']"
+          :items="memory.factions" resource="factions" @changed="load" :tag-keys="['type', 'status']"
           :fields="[['goals', 'Goals'], ['ideology', 'Ideology'], ['headquarters', 'Headquarters']]" empty-text="No factions yet."
         />
       </template>
       <MemoryList
-        v-else-if="tab === 'quests'" :items="memory.quests" title-key="title" :tag-keys="['status']"
+        v-else-if="tab === 'quests'" :items="memory.quests" resource="quests" editable @changed="load" @edit="editMemory('quests', $event)" title-key="title" :tag-keys="['status']"
         :fields="[['hook', 'Hook'], ['objective', 'Objective'], ['reward', 'Reward'], ['questGiver', 'Quest giver'], ['location', 'Location'], ['involvedNpcs', 'Involved']]"
         empty-text="No quests yet — try the Quest generator."
       />
       <MemoryList
-        v-else-if="tab === 'encounters'" :items="memory.encounters" title-key="title" :tag-keys="['calculatedDifficulty']"
+        v-else-if="tab === 'encounters'" :items="memory.encounters" resource="encounters" @changed="load" title-key="title" :tag-keys="['calculatedDifficulty']"
         :fields="[['objective', 'Objective'], ['terrain', 'Terrain'], ['creatures', 'Creatures'], ['adjustedExperience', 'Adjusted XP']]"
         empty-text="No encounters yet — try the Encounter generator."
       />
       <MemoryList
-        v-else-if="tab === 'items'" :items="memory.items" :tag-keys="['type', 'rarity']"
+        v-else-if="tab === 'items'" :items="memory.items" resource="items" editable @changed="load" @edit="editMemory('items', $event)" :tag-keys="['type', 'rarity']"
         :fields="[['properties', 'Properties'], ['history', 'History'], ['location', 'Location']]" empty-text="No items yet — try the Loot generator."
       />
       <ShopList v-else-if="tab === 'shops'" :memory="memory" />
@@ -205,13 +262,46 @@ onMounted(load)
         <CharacterForm v-if="addingCharacter" @create="addCharacter" @cancel="addingCharacter = false" />
         <button v-else class="btn btn-secondary add" @click="addingCharacter = true"><Plus :size="16" /> Add player character</button>
         <MemoryList
-          :items="memory.characters" :tag-keys="['characterClass', 'race']"
+          :items="memory.characters" resource="characters" @changed="load" :tag-keys="['characterClass', 'race']"
           body-key="backstory"
           :fields="[['playerName', 'Player'], ['level', 'Level'], ['armorClass', 'AC'], ['passivePerception', 'Passive Perception']]"
           empty-text="No player characters yet."
         />
       </section>
     </template>
+
+    <MemoryEditor
+      v-if="memoryEditor"
+      :key="`${memoryEditor.resource}-${memoryEditor.item?.id ?? 'new'}`"
+      :resource="memoryEditor.resource"
+      :item="memoryEditor.item"
+      :memory="memory"
+      @saved="memorySaved"
+      @close="memoryEditor = null"
+    />
+
+    <AppModal v-if="editing" :title="`Edit ${memory.campaign.kind === 'ONE_SHOT' ? 'one-shot' : 'campaign'}`" wide @close="editing = null">
+      <form class="stack" @submit.prevent="saveEdit">
+        <div class="field">
+          <label for="e-name">Name</label>
+          <input id="e-name" v-model="editing.name" class="input" required />
+        </div>
+        <div class="field">
+          <label for="e-pitch">Pitch</label>
+          <textarea id="e-pitch" v-model="editing.description" class="textarea" />
+        </div>
+        <div class="field">
+          <label for="e-lore">World lore</label>
+          <textarea id="e-lore" v-model="editing.worldLore" class="textarea lore-input" />
+          <span class="hint">The AI reads this for every generation in this {{ memory.campaign.kind === 'ONE_SHOT' ? 'one-shot' : 'campaign' }}.</span>
+        </div>
+        <div v-if="editError" class="alert alert-error">{{ editError }}</div>
+        <div class="row edit-actions">
+          <button type="button" class="btn btn-ghost" @click="editing = null">Cancel</button>
+          <button class="btn btn-primary" :disabled="savingEdit"><span v-if="savingEdit" class="spinner" /> Save</button>
+        </div>
+      </form>
+    </AppModal>
 
     <GenerateModal
       v-if="generating && memory"
@@ -233,6 +323,8 @@ onMounted(load)
 .lock { color: var(--accent); }
 .locked { margin-bottom: 16px; }
 .add { align-self: flex-start; }
+.lore-input { min-height: 180px; }
+.edit-actions { justify-content: flex-end; }
 
 .generate :deep(.trigger) { background: var(--primary); color: var(--on-color); }
 .generate :deep(.trigger:hover), .generate :deep(.trigger.open) { background: var(--primary-hover); color: var(--on-color); }

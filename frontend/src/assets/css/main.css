@@ -284,6 +284,10 @@ p { margin: 0; }
 }
 .empty h3 { color: var(--text-strong); margin-bottom: 6px; }
 
+/* Something the user's plan doesn't include: still clickable (it explains how to unlock it), but greyed out. */
+.is-locked { opacity: 0.5; filter: grayscale(0.6); }
+.is-locked:hover, .is-locked:focus-visible { opacity: 0.75; }
+
 .spinner {
   width: 16px; height: 16px; border-radius: 50%;
   border: 2px solid currentColor; border-right-color: transparent;

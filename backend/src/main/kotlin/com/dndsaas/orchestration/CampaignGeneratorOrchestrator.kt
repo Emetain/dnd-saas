@@ -6,6 +6,8 @@ import com.dndsaas.domain.CampaignKind
 import com.dndsaas.dto.SavedIdeaResponse
 import com.dndsaas.dto.CampaignInterviewRequest
 import com.dndsaas.dto.CampaignInterviewResponse
+import com.dndsaas.dto.CampaignJobResponse
+import com.dndsaas.service.CampaignArcService
 import com.dndsaas.service.CampaignGeneratorService
 import com.dndsaas.service.UserService
 import org.springframework.stereotype.Component
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Component
 @Component
 class CampaignGeneratorOrchestrator(
     private val campaignGeneratorService: CampaignGeneratorService,
+    private val campaignArcService: CampaignArcService,
     private val userService: UserService,
 ) {
 
@@ -44,6 +47,13 @@ class CampaignGeneratorOrchestrator(
      */
     fun generate(userId: Long, request: CampaignGenerationRequest): CampaignGenerationResult =
         campaignGeneratorService.generate(request, userService.findEntity(userId))
+
+    /** Task: start generating a campaign with all its sessions, in the background. */
+    fun startFullCampaign(userId: Long, request: CampaignGenerationRequest): CampaignJobResponse =
+        campaignArcService.start(userId, request)
+
+    fun fullCampaignStatus(userId: Long, jobId: String): CampaignJobResponse =
+        campaignArcService.status(userId, jobId)
 
     /** Task: build a complete, self-contained adventure for one sitting. */
     fun generateOneShot(userId: Long, request: CampaignGenerationRequest): CampaignGenerationResult =

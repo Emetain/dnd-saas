@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional
 class NpcService(
+    private val memoryReferences: MemoryReferences,
     private val npcRepository: NpcRepository,
     private val locationService: LocationService,
     private val factionService: FactionService,
@@ -71,7 +72,10 @@ class NpcService(
         return toResponse(npcRepository.save(npc))
     }
 
-    fun delete(id: Long) = npcRepository.deleteById(id)
+    fun delete(id: Long) {
+        memoryReferences.detachNpc(id)
+        npcRepository.deleteById(id)
+    }
 
     fun findEntity(id: Long): Npc =
         npcRepository.findById(id)

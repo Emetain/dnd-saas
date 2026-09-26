@@ -123,8 +123,8 @@ class CampaignGeneratorService(
             requiredFields = listOf("questions"),
             systemGuidance = interviewGuidance,
             user = user,
-            // Free: the interview is part of creating a campaign, which /generate charges for.
-            tokenCost = 0,
+            // Charged on top of the generation itself, so the questions can't be spammed for free.
+            tokenCost = INTERVIEW_COST,
         )
 
         val parsed = objectMapper.treeToValue(response.content, CampaignInterviewResponse::class.java)
@@ -340,6 +340,14 @@ class CampaignGeneratorService(
         generateInternal(request, user, GenerationType.CAMPAIGN, oneShot = false)
 
     /**
+     * The first step of a campaign generated with all its sessions: the world and
+     * Session 1, without charging — [CampaignArcService] charges for the whole campaign.
+     */
+    @Transactional
+    fun generateForArc(request: CampaignGenerationRequest, user: User): CampaignGenerationResult =
+        generateInternal(request, user, GenerationType.CAMPAIGN, oneShot = false, tokenCost = 0)
+
+    /**
      * Generates a self-contained one-shot: a small, fully connected world sized
      * for a single sitting, with an ending baked in rather than a cliffhanger.
      *
@@ -374,6 +382,7 @@ class CampaignGeneratorService(
         user: User,
         generationType: GenerationType,
         oneShot: Boolean,
+        tokenCost: Int = generationType.tokenCost,
     ): CampaignGenerationResult {
         validatePartySettings(request.playerCount, request.startingLevel)
         val startedAt = System.currentTimeMillis()
@@ -422,6 +431,7 @@ class CampaignGeneratorService(
             requiredFields = listOf("name", "worldLore"),
             systemGuidance = if (oneShot) "$blueprintGuidance\n\n$oneShotGuidance" else blueprintGuidance,
             user = user,
+            tokenCost = tokenCost,
         )
 
         val blueprint = objectMapper.treeToValue(response.content, CampaignBlueprint::class.java)
@@ -616,6 +626,9 @@ class CampaignGeneratorService(
         const val MAX_LEVEL = 20
         const val MAX_ONE_SHOT_HOURS = 20
         const val MAX_CAMPAIGN_SESSIONS = 100
+
+        /** "Ask me questions": on top of the campaign or one-shot generated afterwards. */
+        const val INTERVIEW_COST = 10
     }
 
     /** Maps the model's free-text type onto the enum, falling back safely. */

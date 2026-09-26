@@ -38,3 +38,33 @@ ALTER TABLE generation_logs DROP CONSTRAINT IF EXISTS generation_logs_type_check
 -- The new SHOP location type hits the same CHECK-constraint issue.
 -- (sessions.debrief is added automatically.)
 ALTER TABLE locations DROP CONSTRAINT IF EXISTS locations_type_check;
+
+-- Phase 6 (sign-in)
+-- Session tokens for the login cookie; only a SHA-256 hash of each token is stored.
+-- (Created automatically with ddl-auto: update; needed by hand where it is "validate".)
+-- Existing plain-text passwords are hashed with BCrypt automatically on startup.
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id          BIGSERIAL PRIMARY KEY,
+    token_hash  VARCHAR(64)  NOT NULL UNIQUE,
+    user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at  TIMESTAMP(6) WITH TIME ZONE NOT NULL,
+    created_at  TIMESTAMP(6) WITH TIME ZONE NOT NULL,
+    updated_at  TIMESTAMP(6) WITH TIME ZONE NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id);
+
+-- Phase 6 (email verification, forgotten passwords, completed sessions)
+-- Accounts made before verification existed count as verified.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS completed BOOLEAN NOT NULL DEFAULT FALSE;
+-- One-time email links; only a SHA-256 hash of each token is stored.
+CREATE TABLE IF NOT EXISTS email_tokens (
+    id          BIGSERIAL PRIMARY KEY,
+    token_hash  VARCHAR(64)  NOT NULL UNIQUE,
+    user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose     VARCHAR(32)  NOT NULL,
+    expires_at  TIMESTAMP(6) WITH TIME ZONE NOT NULL,
+    used_at     TIMESTAMP(6) WITH TIME ZONE,
+    created_at  TIMESTAMP(6) WITH TIME ZONE NOT NULL,
+    updated_at  TIMESTAMP(6) WITH TIME ZONE NOT NULL
+);

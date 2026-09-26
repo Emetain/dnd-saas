@@ -16,6 +16,8 @@ data class UserResponse(
     val allowanceTokens: Long,
     val purchasedTokens: Long,
     val createdAt: Instant,
+    /** Generating needs a verified email address. */
+    val emailVerified: Boolean,
 )
 
 /**
@@ -25,6 +27,33 @@ data class UserRegistrationRequest(
     val email: String,
     val displayName: String,
     val password: String,
+)
+
+data class LoginRequest(
+    val email: String = "",
+    val password: String = "",
+)
+
+data class ChangePasswordRequest(
+    val currentPassword: String = "",
+    val newPassword: String = "",
+)
+
+data class TokenRequest(
+    val token: String = "",
+)
+
+data class ForgotPasswordRequest(
+    val email: String = "",
+)
+
+data class ResetPasswordRequest(
+    val token: String = "",
+    val newPassword: String = "",
+)
+
+data class UpdateProfileRequest(
+    val displayName: String = "",
 )
 
 /**

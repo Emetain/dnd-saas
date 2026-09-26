@@ -3,17 +3,17 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Coins, CreditCard, Gift, History, LayoutDashboard, Lock, LogOut, Plus, ScrollText, Castle, Library,
-  Moon, Sun, Monitor,
+  Moon, Sun, Monitor, UserCog,
 } from 'lucide-vue-next'
 import NavDropdown from './NavDropdown.vue'
 import NarrionLogo from './NarrionLogo.vue'
 import { useTheme } from '../stores/theme'
-import { useWelcome } from '../stores/welcome'
-import { generatorGroups } from '../data/generators'
+import { findGenerator, generatorGroups } from '../data/generators'
+import { useAccess } from '../stores/access'
 import { tierLabels, useSession } from '../stores/session'
 
 const { state, isFree, signOut } = useSession()
-const { openAccountForm } = useWelcome()
+const { isLocked, guardGenerator } = useAccess()
 const { preference, resolved, setTheme, toggleTheme } = useTheme()
 const themeOptions = [
   { value: 'light', label: 'Light', icon: Sun },
@@ -23,13 +23,12 @@ const themeOptions = [
 const route = useRoute()
 const router = useRouter()
 
-const initials = computed(() =>
-  (state.user?.displayName || '?').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
-)
+/** The profile picture for now: the first letter of the display name. */
+const initial = computed(() => (state.user?.displayName?.trim()?.[0] || '?').toUpperCase())
 const section = computed(() => route.path.split('/')[1] || 'dashboard')
 
-function logout() {
-  signOut()
+async function logout() {
+  await signOut()
   router.push('/')
 }
 </script>
@@ -55,10 +54,10 @@ function logout() {
             <ScrollText :size="16" />
             <span><strong>New one-shot</strong><small>A single-sitting adventure</small></span>
           </RouterLink>
-          <RouterLink to="/generators/campaign" class="menu-item">
+          <RouterLink to="/generators/campaign" class="menu-item" :class="{ 'is-locked': isLocked(findGenerator('campaign')) }" @click.capture="guardGenerator($event, findGenerator('campaign'))">
             <Castle :size="16" />
             <span>
-              <strong>New campaign <span v-if="isFree" class="badge badge-red">Pro</span></strong>
+              <strong>New campaign <Lock v-if="isLocked(findGenerator('campaign'))" :size="12" class="lock" /></strong>
               <small>A whole world, generated</small>
             </span>
           </RouterLink>
@@ -77,10 +76,12 @@ function logout() {
                 :key="gen.slug"
                 :to="`/generators/${gen.slug}`"
                 class="mega-item"
+                :class="{ 'is-locked': isLocked(gen) }"
+                @click.capture="guardGenerator($event, gen)"
               >
                 <component :is="gen.icon" :size="15" />
                 <span>{{ gen.label }}</span>
-                <Lock v-if="isFree && !gen.free" :size="12" class="lock" />
+                <Lock v-if="isLocked(gen)" :size="12" class="lock" />
               </RouterLink>
             </div>
           </div>
@@ -127,14 +128,18 @@ function logout() {
         </button>
 
         <template v-if="!state.user">
-          <button class="btn btn-sm btn-nav" @click="openAccountForm('existing')">Sign in</button>
-          <button class="btn btn-sm btn-accent" @click="openAccountForm('register')">Register</button>
+          <RouterLink to="/login" class="btn btn-sm btn-nav">Sign in</RouterLink>
+          <RouterLink to="/register" class="btn btn-sm btn-accent">Register</RouterLink>
         </template>
 
-        <NavDropdown v-if="state.user" :label="initials" align="right">
+        <NavDropdown v-if="state.user" :label="state.user.displayName" align="right" class="account-menu">
+          <template #trigger>
+            <span class="avatar" aria-hidden="true">{{ initial }}</span>
+            <span class="user-name">{{ state.user.displayName }}</span>
+          </template>
           <div class="account">
             <strong>{{ state.user.displayName }}</strong>
-            <span class="muted small">{{ state.user.email }} · id {{ state.user.id }}</span>
+            <span class="muted small">{{ state.user.email }}</span>
             <span class="badge" :class="isFree ? 'badge' : 'badge-blue'">{{ tierLabels[state.user.subscriptionTier] }}</span>
           </div>
           <div class="theme-picker">
@@ -148,9 +153,13 @@ function logout() {
               </button>
             </div>
           </div>
+          <RouterLink to="/account" class="menu-item">
+            <UserCog :size="16" />
+            <span><strong>Account settings</strong><small>Name and password</small></span>
+          </RouterLink>
           <button class="menu-item as-button" @click="logout">
             <LogOut :size="16" />
-            <span><strong>Switch account</strong><small>Sign in as someone else</small></span>
+            <span><strong>Sign out</strong><small>Of this browser</small></span>
           </button>
         </NavDropdown>
       </div>
@@ -250,4 +259,13 @@ function logout() {
   .link { padding: 0 8px; }
   .mega { grid-template-columns: 1fr 1fr; }
 }
+.account-menu :deep(.trigger) { gap: 8px; padding-left: 6px; }
+.avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: var(--accent); color: var(--on-color);
+  font-size: 13px; font-weight: 700; line-height: 1;
+}
+.user-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 560; }
+@media (max-width: 720px) { .user-name { display: none; } }
 </style>

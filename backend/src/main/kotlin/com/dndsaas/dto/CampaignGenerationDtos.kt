@@ -108,6 +108,8 @@ data class CampaignGenerationRequest(
     val questCount: Int = 4,
     val temperature: Double = 0.9,
     val mock: Boolean = false,
+    /** Only for a campaign generated with all its sessions: how many sessions to plan. */
+    val sessionCount: Int = 0,
 )
 
 // --- The blueprint the model returns (parsed, then persisted) ---
@@ -207,3 +209,26 @@ data class CampaignGenerationResult(
     val generatedAt: Instant,
 )
 
+
+// --- A campaign generated with all its sessions (runs in the background) ---
+
+enum class CampaignJobStatus { RUNNING, DONE, FAILED }
+
+/** Progress of a campaign being generated with all its sessions; polled by the frontend. */
+data class CampaignJobResponse(
+    val id: String,
+    val status: CampaignJobStatus,
+    val sessionsTotal: Int,
+    val sessionsPlanned: Int,
+    /** AI calls finished and expected in total — the world first, then batches of sessions. */
+    val stepsDone: Int,
+    val stepsTotal: Int,
+    /** The quoted price; [charged] is what was actually taken (less if the job stopped early). */
+    val cost: Int,
+    val charged: Int?,
+    val campaignId: Long?,
+    val sessionTitles: List<String>,
+    /** The world and Session 1, once they exist. */
+    val result: CampaignGenerationResult?,
+    val error: String?,
+)

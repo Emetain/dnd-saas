@@ -1,61 +1,46 @@
 import { reactive, computed } from 'vue'
-import { ApiError, setApiUser, tokenApi, userApi } from '../services/api'
+import { ApiError, authApi, setUnauthorizedHandler, tokenApi, userApi } from '../services/api'
 
 /**
- * Who is using the app, plus their live token balance.
+ * Who is signed in, plus their live token balance.
  *
- * There is no login yet: the chosen user id is remembered in this browser and
- * sent as the X-User-Id header. When authentication arrives, only this store
- * needs to change.
+ * Signing in sets an HttpOnly session cookie (JavaScript can't read it), so on
+ * page load the store simply asks the backend who the cookie belongs to.
  */
-const STORAGE_KEY = 'narrion.userId'
-/** Key used before the rename to Narrion — read once so nobody is signed out. */
-const LEGACY_KEY = 'dndsaas.userId'
-
 const state = reactive({
   user: null,
   balance: null,
   loading: true,
+  /** Set when a session ran out mid-use, so the sign-in page can say why. */
+  expired: false,
 })
 
-function readStoredId() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY)
-    localStorage.removeItem(LEGACY_KEY)
-    return raw ? Number(raw) : null
-  } catch {
-    return null
-  }
-}
-
-function storeId(id) {
-  try {
-    if (id == null) localStorage.removeItem(STORAGE_KEY)
-    else localStorage.setItem(STORAGE_KEY, String(id))
-  } catch {
-    // Storage unavailable (private mode); the session just won't survive a reload.
-  }
-}
-
-async function signIn(id) {
-  const user = await userApi.get(id)
+async function setUser(user) {
   state.user = user
-  setApiUser(user.id)
-  storeId(user.id)
-  await refreshBalance()
+  state.expired = false
+  state.balance = await tokenApi.balance(user.id)
   return user
 }
 
-async function register(form) {
-  const user = await userApi.register(form)
-  return signIn(user.id)
+async function login(email, password) {
+  return setUser(await authApi.login(email, password))
 }
 
-function signOut() {
+async function register(form) {
+  return setUser(await authApi.register(form))
+}
+
+function clear() {
   state.user = null
   state.balance = null
-  setApiUser(null)
-  storeId(null)
+}
+
+async function signOut() {
+  try {
+    await authApi.logout()
+  } finally {
+    clear()
+  }
 }
 
 /** Re-reads the user and balance, e.g. after a generation or purchase. */
@@ -67,21 +52,26 @@ async function refreshBalance() {
 }
 
 async function restore() {
-  const id = readStoredId()
-  if (id != null) {
-    try {
-      await signIn(id)
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 404) signOut()
-    }
+  try {
+    await setUser(await authApi.me())
+  } catch (e) {
+    if (!(e instanceof ApiError && e.status === 401)) console.error('Could not restore the session', e)
+    clear()
   }
   state.loading = false
 }
 
+// Any 401 later on means the session ended (expired, or signed out elsewhere).
+setUnauthorizedHandler(() => {
+  if (!state.user) return
+  clear()
+  state.expired = true
+})
+
 const isFree = computed(() => state.user?.subscriptionTier === 'FREE')
 
 export function useSession() {
-  return { state, isFree, signIn, register, signOut, refreshBalance, restore }
+  return { state, isFree, login, register, signOut, refreshBalance, restore }
 }
 
 export const tierLabels = {

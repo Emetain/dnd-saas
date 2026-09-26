@@ -4,22 +4,32 @@ import { useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, Bookmark, Check, Dices, Lock, MessageSquare, Sparkles, X } from 'lucide-vue-next'
 import { campaignGeneratorApi } from '../../services/api'
 import { useSession } from '../../stores/session'
+import { useAccess } from '../../stores/access'
+import { findGenerator } from '../../data/generators'
 import JsonView from '../../components/JsonView.vue'
 import GenerationError from '../../components/GenerationError.vue'
+import GenerationOverlay from '../../components/GenerationOverlay.vue'
 import { gameSystems, limits, randomIdea, range } from '../../data/campaignOptions'
 
 /**
- * The campaign generator. Step 1 (optional, free): the AI interviews the DM
+ * The campaign generator. Step 1 (optional, 10 tokens): the AI interviews the DM
  * about their idea. Step 2: the idea plus the answers become a campaign or
  * one-shot, saved as structured Campaign Memory.
  */
 const props = defineProps({ generator: { type: Object, required: true } })
-const { isFree, refreshBalance } = useSession()
+const { refreshBalance } = useSession()
+const { guard, isLocked } = useAccess()
 const router = useRouter()
 
 const oneShot = computed(() => props.generator.slug === 'one-shot')
+/** A campaign with every session planned at once (Pro+); runs as a background job. */
+const fullCampaign = computed(() => props.generator.slug === 'full-campaign')
+const FULL_MAX_SESSIONS = 30
+const modes = ['campaign', 'full-campaign', 'one-shot'].map(findGenerator)
 const step = ref('idea') // idea -> questions -> result
 const busy = ref(false)
+/** Only the real generation shows the full-screen overlay; the interview keeps the small spinner. */
+const generating = ref(false)
 const error = ref(null)
 const interview = ref(null)
 const answers = reactive({})
@@ -27,7 +37,9 @@ const result = ref(null)
 
 /** A fresh example idea every time the page opens (the page is rebuilt per mode). */
 const ideaPlaceholder = randomIdea(oneShot.value)
-const lengthOptions = range(oneShot.value ? limits.oneShotHours : limits.campaignSessions)
+const lengthOptions = oneShot.value
+  ? range(limits.oneShotHours)
+  : fullCampaign.value ? range(FULL_MAX_SESSIONS).filter((n) => n >= 2) : range(limits.campaignSessions)
 
 const form = reactive({
   idea: '',
@@ -37,7 +49,7 @@ const form = reactive({
   playerCount: 4,
   startingLevel: oneShot.value ? 3 : 1,
   /** Hours for a one-shot, sessions for a campaign. */
-  length: oneShot.value ? 4 : 12,
+  length: oneShot.value ? 4 : fullCampaign.value ? 10 : 12,
   additionalNotes: '',
   locationCount: 5,
   factionCount: 3,
@@ -115,9 +127,21 @@ function requestBody() {
   return { ...rest, expectedLength: `${length} ${unit}${length === 1 ? '' : 's'}` }
 }
 
-function switchMode(slug) {
-  if (slug !== props.generator.slug) router.push(`/generators/${slug}`)
+function switchMode(mode) {
+  if (mode.slug === props.generator.slug || !guard(mode.minTier, mode.label)) return
+  router.push(`/generators/${mode.slug}`)
 }
+
+/**
+ * Mirrors CampaignArcService.price: 50 for the world and Session 1, 25 per further
+ * session, minus 25 for every 5 sessions.
+ */
+function fullPrice(sessions) {
+  return 50 + (sessions - 1) * 25 - Math.floor(sessions / 5) * 25
+}
+const price = computed(() => (fullCampaign.value ? fullPrice(form.length) : props.generator.cost))
+/** What the same sessions cost one by one: a campaign plus "Next session" for the rest. */
+const oneByOne = computed(() => 50 + (form.length - 1) * 25)
 
 async function askQuestions() {
   error.value = null
@@ -130,18 +154,24 @@ async function askQuestions() {
     error.value = e
   } finally {
     busy.value = false
+    refreshBalance()
   }
 }
 
+/** Progress of a full campaign being generated; polled while it runs. */
+const job = ref(null)
+const POLL_MS = 2000
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
 async function generate() {
+  if (fullCampaign.value) return generateFull()
   error.value = null
   busy.value = true
+  generating.value = true
   try {
     const body = {
       ...requestBody(),
-      answers: (interview.value?.questions || [])
-        .filter((q) => answers[q.id]?.trim())
-        .map((q) => ({ questionId: q.id, question: q.question, answer: answers[q.id] })),
+      answers: answeredQuestions(),
     }
     result.value = oneShot.value ? await campaignGeneratorApi.oneShot(body) : await campaignGeneratorApi.generate(body)
     step.value = 'result'
@@ -149,15 +179,63 @@ async function generate() {
     error.value = e
   } finally {
     busy.value = false
+    generating.value = false
     refreshBalance()
   }
 }
+
+function answeredQuestions() {
+  return (interview.value?.questions || [])
+    .filter((q) => answers[q.id]?.trim())
+    .map((q) => ({ questionId: q.id, question: q.question, answer: answers[q.id] }))
+}
+
+async function generateFull() {
+  error.value = null
+  busy.value = true
+  generating.value = true
+  job.value = null
+  try {
+    let status = await campaignGeneratorApi.full({ ...requestBody(), answers: answeredQuestions(), sessionCount: form.length })
+    job.value = status
+    while (status.status === 'RUNNING') {
+      await sleep(POLL_MS)
+      status = await campaignGeneratorApi.job(status.id)
+      job.value = status
+    }
+    if (status.status === 'FAILED') {
+      // Whatever was made is kept, and only that was charged.
+      error.value = {
+        message: status.campaignId
+          ? `Stopped after ${status.sessionsPlanned} of ${status.sessionsTotal} sessions (${status.error}). ` +
+            `You were charged ${status.charged} tokens for what was made — add the rest from the campaign's Sessions tab`
+          : status.error,
+      }
+    }
+    if (status.result) {
+      result.value = status.result
+      step.value = 'result'
+    }
+  } catch (e) {
+    error.value = e
+  } finally {
+    busy.value = false
+    generating.value = false
+    refreshBalance()
+  }
+}
+
+const jobDetail = computed(() => {
+  const j = job.value
+  if (!j) return ''
+  return j.sessionsPlanned ? `${j.sessionsPlanned} of ${j.sessionsTotal} sessions planned` : 'Building the world and Session 1…'
+})
 
 const createdSummary = computed(() => {
   const c = result.value?.created
   if (!c) return []
   return [
-    ['Locations', c.locations], ['Factions', c.factions], ['NPCs', c.npcs], ['Quests', c.quests], ['Sessions', c.sessions],
+    ['Locations', c.locations], ['Factions', c.factions], ['NPCs', c.npcs], ['Quests', c.quests], ['Sessions', fullCampaign.value && job.value ? job.value.sessionsPlanned : c.sessions],
   ].filter(([, n]) => n > 0)
 })
 </script>
@@ -165,10 +243,9 @@ const createdSummary = computed(() => {
 <template>
   <div class="stack">
     <div class="segmented mode">
-      <button :class="{ active: !oneShot }" :disabled="isFree" @click="switchMode('campaign')">
-        <Lock v-if="isFree" :size="12" /> Full campaign
+      <button v-for="mode in modes" :key="mode.slug" :class="{ active: mode.slug === generator.slug, 'is-locked': isLocked(mode) }" @click="switchMode(mode)">
+        <Lock v-if="isLocked(mode)" :size="12" /> {{ mode.label }}
       </button>
-      <button :class="{ active: oneShot }" @click="switchMode('one-shot')">One-shot</button>
     </div>
 
     <ol class="steps">
@@ -244,6 +321,10 @@ const createdSummary = computed(() => {
               {{ n }} {{ oneShot ? (n === 1 ? 'hour' : 'hours') : (n === 1 ? 'session' : 'sessions') }}
             </option>
           </select>
+          <span v-if="fullCampaign" class="hint">
+            Every session is planned · <strong>{{ price }} tokens</strong>
+            <template v-if="oneByOne > price"> (saves {{ oneByOne - price }} vs. one by one)</template>
+          </span>
         </div>
       </div>
 
@@ -261,7 +342,7 @@ const createdSummary = computed(() => {
         <button type="button" class="btn btn-ghost" :disabled="busy" @click="generate">Skip questions, generate now</button>
         <button class="btn btn-primary" :disabled="busy">
           <span v-if="busy" class="spinner" /><MessageSquare v-else :size="16" />
-          Ask me questions <span class="free">free</span>
+          Ask me questions <span class="price-chip">10 tokens</span>
         </button>
       </div>
     </form>
@@ -293,7 +374,7 @@ const createdSummary = computed(() => {
         <button class="btn btn-ghost" @click="step = 'idea'"><ArrowLeft :size="16" /> Back</button>
         <button class="btn btn-primary" :disabled="busy" @click="generate">
           <span v-if="busy" class="spinner" /><Sparkles v-else :size="16" />
-          Generate {{ oneShot ? 'one-shot' : 'campaign' }} · {{ generator.cost }} tokens
+          Generate {{ oneShot ? 'one-shot' : 'campaign' }} · {{ price }} tokens
         </button>
       </div>
     </div>
@@ -315,13 +396,34 @@ const createdSummary = computed(() => {
           Open {{ oneShot ? 'one-shot' : 'campaign' }} <ArrowRight :size="16" />
         </RouterLink>
       </div>
-      <div class="card">
+      <div v-if="fullCampaign && job" class="card">
+        <h2>{{ job.sessionsPlanned }} sessions planned</h2>
+        <ol class="session-titles">
+          <li v-for="(title, i) in job.sessionTitles" :key="i">{{ title }}</li>
+        </ol>
+        <p class="muted small">Open the campaign to read every plan. After playing a session, add your notes and rewrite the next ones if the story went elsewhere.</p>
+      </div>
+      <div v-else class="card">
         <h2>{{ oneShot ? 'Adventure plan' : 'Session 1 plan' }}</h2>
         <JsonView :value="result.firstSessionPlan" />
       </div>
     </div>
 
     <GenerationError v-if="error" :error="error" />
+
+    <!-- Rough estimates for gpt-4o-mini; the percentage eases towards them. -->
+    <GenerationOverlay
+      :active="generating"
+      :failed="!!error"
+      :expected-seconds="oneShot ? 35 : fullCampaign ? 45 : 60"
+      :title="oneShot ? 'Forging your one-shot…' : 'Forging your campaign…'"
+      :tone="form.tone"
+      :themes="form.themes"
+      :idea="form.idea"
+      :steps-done="job?.stepsDone ?? 0"
+      :steps-total="job?.stepsTotal ?? 0"
+      :detail="jobDetail"
+    />
   </div>
 </template>
 
@@ -353,7 +455,7 @@ const createdSummary = computed(() => {
 .steps li.done { background: var(--primary-soft-strong); color: var(--primary-text); }
 .sizes summary { cursor: pointer; font-weight: 560; color: var(--text-secondary); margin-bottom: 12px; }
 .actions { flex-wrap: wrap; }
-.free { font-size: 11px; background: rgba(255, 255, 255, 0.2); padding: 1px 6px; border-radius: 999px; }
+.price-chip { font-size: 11px; background: rgba(255, 255, 255, 0.2); padding: 1px 6px; border-radius: 999px; }
 .understanding { border-left: 3px solid var(--primary); }
 .understanding p { margin-top: 6px; }
 .question h3 { margin: 0 0 2px; }
@@ -367,6 +469,7 @@ const createdSummary = computed(() => {
 .created { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; border-top: 3px solid var(--primary); }
 .created h2 { margin: 0; }
 .counts { flex-wrap: wrap; }
+.session-titles { margin: 8px 0 12px; padding-left: 22px; display: grid; gap: 4px; }
 .check-icon {
   width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
   background: var(--success-soft); color: var(--success-text);

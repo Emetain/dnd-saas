@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -30,14 +29,14 @@ class CampaignController(
     @PostMapping
     @Operation(summary = "Create a campaign owned by the calling user")
     fun create(
-        @RequestHeader(USER_ID_HEADER) userId: Long,
+        @CurrentUser userId: Long,
         @RequestBody request: CampaignRequest,
     ): ResponseEntity<CampaignResponse> =
         ResponseEntity.status(HttpStatus.CREATED).body(orchestrator.createCampaign(userId, request))
 
     @GetMapping
-    @Operation(summary = "List campaigns — only the caller's when X-User-Id is sent")
-    fun list(@RequestHeader(USER_ID_HEADER, required = false) userId: Long?): List<CampaignResponse> =
+    @Operation(summary = "List the signed-in user's campaigns")
+    fun list(@CurrentUser userId: Long): List<CampaignResponse> =
         orchestrator.listCampaigns(userId)
 
     @GetMapping("/{id}")
