@@ -127,8 +127,8 @@ function logout() {
         </button>
 
         <template v-if="!state.user">
-          <button class="btn btn-sm btn-nav" @click="openAccountForm('existing')">Sign in</button>
-          <button class="btn btn-sm btn-accent" @click="openAccountForm('register')">Register</button>
+          <button class="btn btn-sm btn-secondary" @click="openAccountForm('existing')">Sign in</button>
+          <button class="btn btn-sm btn-primary" @click="openAccountForm('register')">Register</button>
         </template>
 
         <NavDropdown v-if="state.user" :label="initials" align="right">
@@ -176,71 +176,75 @@ function logout() {
   padding: 0 20px; display: flex; align-items: center;
 }
 
-.brand { display: flex; align-items: center; color: var(--on-color); width: 200px; flex-shrink: 0; }
-.btn-nav { background: rgba(255, 255, 255, 0.1); color: var(--on-color); }
-.btn-nav:hover { background: rgba(255, 255, 255, 0.18); color: var(--on-color); }
-.brand:hover { color: var(--on-color); }
+.brand { display: flex; align-items: center; color: var(--text); width: 200px; flex-shrink: 0; }
+.brand:hover { color: var(--text); }
 
 .icon-btn {
-  width: 32px; height: 32px; border-radius: 999px; border: none; cursor: pointer;
+  width: 44px; height: 44px; border-radius: 999px; cursor: pointer;
   display: grid; place-items: center;
-  background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.85);
+  background: transparent; color: var(--text-muted); border: 1px solid var(--border);
 }
-.icon-btn:hover { background: rgba(255, 255, 255, 0.18); color: var(--on-color); }
+.icon-btn:hover { color: var(--text); border-color: var(--border-strong); }
 
-.theme-picker { padding: 4px 10px 10px; border-bottom: 1px solid var(--border); margin-bottom: 6px; display: flex; flex-direction: column; gap: 6px; }
-.theme-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
-.theme-picker .segmented button { padding: 5px 9px; font-size: 12px; }
+.theme-picker { padding: 4px 10px 10px; border-bottom: 1px solid var(--divider); margin-bottom: 6px; display: flex; flex-direction: column; gap: 6px; }
+.theme-label { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-subtle); }
+.theme-picker .segmented button { padding: 0 10px; font-size: 13px; }
 
 .links {
   display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0;
   margin-left: max(24px, calc(50% - 778px));
 }
 .link {
-  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px;
-  border-radius: var(--radius-sm); color: rgba(255, 255, 255, 0.78); font-weight: 560;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px;
+  border-radius: var(--radius-sm); color: var(--text-muted); font-size: 14px; font-weight: 500;
 }
-.link:hover { background: rgba(255, 255, 255, 0.08); color: var(--on-color); }
-.link.active { color: var(--on-color); background: rgba(255, 255, 255, 0.1); }
+.link:hover { background: var(--raised); color: var(--text); }
+.link.active { color: var(--text); background: var(--raised); }
 
 .right { display: flex; align-items: center; gap: 10px; margin-left: 16px; }
 .tokens {
-  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
-  border-radius: 999px; background: rgba(255, 255, 255, 0.1); color: var(--on-color);
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px;
+  border-radius: 999px; border: 1px solid var(--border); color: var(--text);
+  font-size: 14px; font-weight: 400; font-variant-numeric: tabular-nums;
 }
-.tokens:hover { background: rgba(255, 255, 255, 0.16); color: var(--on-color); }
-.tokens-label { opacity: 0.7; font-size: 12px; }
+.tokens svg { color: var(--accent-text); }
+.tokens strong { font-weight: 600; }
+.tokens:hover { color: var(--text); border-color: var(--border-strong); }
+.tokens-label { color: var(--text-subtle); font-size: 12px; }
 
-/* Dropdown content */
+/* Dropdown content. Only the direct <span> is the two-line label; a badge inside it keeps its own layout. */
 .menu-item {
-  display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px;
-  border-radius: var(--radius-sm); color: var(--text-secondary);
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px;
+  border-radius: var(--radius-sm); color: var(--text-muted); font-weight: 400;
 }
-.menu-item:hover { background: var(--primary-soft); color: var(--primary-text); }
-.menu-item span { display: flex; flex-direction: column; }
+.menu-item:hover { background: var(--raised); color: var(--accent-text); }
+.menu-item > span { display: flex; flex-direction: column; }
 .menu-item strong { font-weight: 600; color: var(--text-strong); display: inline-flex; gap: 6px; align-items: center; }
-.menu-item small { color: var(--text-muted); font-size: 12px; }
-.menu-item svg { margin-top: 2px; flex-shrink: 0; }
+.menu-item small { color: var(--text-muted); font-size: 13px; }
+.menu-item > svg { margin-top: calc((1lh - 16px) / 2); flex-shrink: 0; }
 .as-button { width: 100%; border: none; background: none; font: inherit; text-align: left; cursor: pointer; }
 
 .mega { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 16px; padding: 6px; }
 .mega-group { display: flex; flex-direction: column; margin-bottom: 8px; }
 .mega-title {
-  font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--text-muted); padding: 6px 8px;
+  font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-subtle); padding: 6px 8px;
 }
 .mega-item {
-  display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: var(--radius-sm);
-  color: var(--text-strong); font-weight: 520;
+  display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 8px; border-radius: var(--radius-sm);
+  color: var(--text); font-size: 14px; font-weight: 500;
 }
-.mega-item:hover { background: var(--primary-soft); color: var(--primary-text); }
-.mega-item .lock { margin-left: auto; color: var(--accent); }
+.mega-item svg { color: var(--text-muted); }
+.mega-item:hover { background: var(--raised); color: var(--text); }
+.mega-item:hover svg { color: var(--accent-text); }
+.mega-item .lock { margin-left: auto; color: var(--text-subtle); }
 .mega-footer {
-  display: block; border-top: 1px solid var(--border); margin-top: 4px; padding: 10px 14px 4px;
-  font-weight: 560; font-size: 13px;
+  display: flex; align-items: center; min-height: 44px; border-top: 1px solid var(--divider); margin-top: 4px; padding: 0 10px;
+  font-weight: 500; font-size: 14px;
 }
 
-.account { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px 12px; border-bottom: 1px solid var(--border); margin-bottom: 6px; align-items: flex-start; }
+.account { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px 12px; border-bottom: 1px solid var(--divider); margin-bottom: 6px; align-items: flex-start; }
+.account strong { color: var(--text); }
 
 @media (max-width: 900px) {
   .brand :deep(.word), .tokens-label { display: none; }

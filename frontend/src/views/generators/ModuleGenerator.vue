@@ -4,8 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { Check, RotateCcw, Save, Sparkles } from 'lucide-vue-next'
 import { campaignApi, characterApi, generatorApi } from '../../services/api'
 import { useSession } from '../../stores/session'
-import JsonView from '../../components/JsonView.vue'
 import GenerationError from '../../components/GenerationError.vue'
+import MarkdownView from '../../components/MarkdownView.vue'
+import ResultCard from '../../components/ResultCard.vue'
+import ResultFields from '../../components/ResultFields.vue'
+import { exampleToText, toPlainText } from '../../utils/text'
+import { findExample } from '../../data/examples'
 
 /**
  * Runs an in-campaign generator (NPC, Quest, Loot, ...) or a free-form
@@ -31,6 +35,8 @@ const error = ref(null)
 const result = ref(null)
 /** Whether the shown result was generated as a preview (so it can still be saved). */
 const ranAsPreview = ref(false)
+/** How many results this screen has generated — the "Roll #n" in the result card. */
+const rolls = ref(0)
 
 const form = reactive({
   campaignId: props.fixedCampaignId ?? (route.query.campaign ? Number(route.query.campaign) : null),
@@ -41,9 +47,45 @@ const form = reactive({
   preview: false,
 })
 
+/**
+ * Opened with "Use this example" (?example=<id>): its settings are filled in and
+ * the example is shown as the result until the first real generation.
+ */
+const found = props.fixedCampaignId ? null : findExample(route.query.example)
+const example = found?.type.generator === props.generator.slug ? found.example : null
+if (example) {
+  form.instruction = example.prefill.instruction ?? ''
+  form.difficulty = example.prefill.difficulty ?? ''
+}
+const exampleText = example ? exampleToText(example) : ''
+
 const isAsk = computed(() => props.generator.kind === 'ask')
 const campaign = computed(() => campaigns.value.find((c) => c.id === form.campaignId))
 const canRun = computed(() => form.campaignId && (!props.generator.needsCharacter || form.targetId))
+
+// --- The result card ---
+const content = computed(() => result.value?.content)
+const contentIsText = computed(() => typeof content.value === 'string')
+/** Fields shown in the card's small label rather than in the body. */
+const LABEL_KEYS = ['race', 'occupation']
+const resultTitle = computed(() =>
+  (!contentIsText.value && (content.value?.name || content.value?.title)) || props.generator.label,
+)
+const resultLabel = computed(() => {
+  if (contentIsText.value) return props.generator.label
+  const parts = LABEL_KEYS.map((key) => content.value?.[key]).filter(Boolean)
+  return parts.length ? parts.join(' · ') : props.generator.label
+})
+const resultOptions = computed(() =>
+  [
+    campaign.value?.name,
+    form.difficulty && form.difficulty.charAt(0) + form.difficulty.slice(1).toLowerCase(),
+    `Creativity ${form.temperature.toFixed(1)}`,
+  ].filter(Boolean).join(' · '),
+)
+const copyText = computed(() =>
+  contentIsText.value ? content.value : [resultTitle.value, toPlainText(content.value)].join('\n\n'),
+)
 
 async function loadCharacters() {
   characters.value = []
@@ -76,6 +118,7 @@ async function run() {
           difficulty: form.difficulty,
           targetId: form.targetId,
         })
+    rolls.value += 1
     emit('generated', result.value)
   } catch (e) {
     error.value = e
@@ -178,18 +221,27 @@ onMounted(async () => {
 
     <GenerationError v-if="error" :error="error" />
 
-    <div v-if="result" class="card result">
-      <div class="row-between result-head">
-        <div class="row">
-          <h2>Result</h2>
-        </div>
-        <div class="row">
-          <button class="btn btn-secondary btn-sm" :disabled="running" @click="run"><RotateCcw :size="14" /> Regenerate</button>
-          <button v-if="ranAsPreview && !result.saved" class="btn btn-primary btn-sm" :disabled="saving" @click="save">
-            <Save :size="14" /> Save to {{ campaign?.name }}
-          </button>
-        </div>
-      </div>
+    <ResultCard
+      v-if="example && !result && !rolls"
+      :label="example.label" :title="example.name" :options="example.settings" :copy-text="exampleText"
+    >
+      <template #actions>
+        <button class="btn btn-secondary btn-sm" :disabled="running || !canRun" @click="run"><RotateCcw :size="16" /> Reroll</button>
+      </template>
+      <ResultFields :fields="example.fields" />
+      <template #footer-end><span>Example result</span></template>
+    </ResultCard>
+
+    <ResultCard
+      v-if="result"
+      :label="resultLabel" :title="resultTitle" :options="resultOptions" :roll="rolls" :copy-text="copyText"
+    >
+      <template #actions>
+        <button class="btn btn-secondary btn-sm" :disabled="running" @click="run"><RotateCcw :size="16" /> Reroll</button>
+        <button v-if="ranAsPreview && !result.saved" class="btn btn-primary btn-sm" :disabled="saving" @click="save">
+          <Save :size="16" /> Save to {{ campaign?.name }}
+        </button>
+      </template>
 
       <div v-if="result.created?.length" class="alert alert-success saved">
         <Check :size="16" />
@@ -199,17 +251,14 @@ onMounted(async () => {
         </span>
       </div>
 
-      <JsonView :value="result.content" />
-    </div>
+      <MarkdownView v-if="contentIsText" :source="content" />
+      <ResultFields v-else :value="content" :hide="['name', 'title', ...LABEL_KEYS]" />
+    </ResultCard>
   </div>
 </template>
 
 <style scoped>
 .options { display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
 .creativity { width: 220px; }
-.creativity input { accent-color: var(--primary); }
-.check input { accent-color: var(--primary); }
-.result-head { margin-bottom: 16px; }
-.result-head h2 { margin: 0; }
-.saved { margin-bottom: 16px; }
+.saved { margin-bottom: 24px; }
 </style>

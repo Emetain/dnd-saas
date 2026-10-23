@@ -98,7 +98,7 @@ async function generateNext() {
         </p>
       </div>
       <button v-if="isFree" class="btn btn-secondary" disabled><Lock :size="14" /> Pro</button>
-      <button v-else class="btn btn-ai" :disabled="generating || needsDebrief" @click="generateNext">
+      <button v-else class="btn btn-primary" :disabled="generating || needsDebrief" @click="generateNext">
         <span v-if="generating" class="spinner" /><Sparkles v-else :size="16" />
         {{ generating ? 'Planning the next session…' : `Generate Session ${(latest?.sessionNumber ?? 0) + 1} · ${NEXT_SESSION_COST} tokens` }}
       </button>
@@ -176,8 +176,6 @@ async function generateNext() {
 .next { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 3px solid var(--primary); }
 .next h3 { margin: 0 0 4px; }
 .next-hint { margin-top: 6px; color: var(--accent-text); }
-.btn-ai { background: linear-gradient(135deg, var(--primary), var(--accent)); color: var(--on-color); }
-.btn-ai:hover:not(:disabled) { filter: brightness(1.08); color: var(--on-color); }
 
 .session { display: flex; flex-direction: column; gap: 14px; }
 .session h3 { margin: 0; }

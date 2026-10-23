@@ -8,7 +8,7 @@ import { bannerSlides } from '../data/bannerSlides'
 
 /**
  * The banner below the navigation bar on the home page (and for visitors who
- * are not signed in): a slideshow filling 70% of the screen, with the tagline
+ * are not signed in): a slideshow in a bordered panel, with the tagline
  * and the main actions. It scrolls away while the navigation bar stays at the top.
  */
 const { state, isFree } = useSession()
@@ -55,67 +55,73 @@ const continueLink = computed(() => {
 })
 </script>
 
+
 <template>
-  <section
-    class="banner"
-    aria-roledescription="carousel" aria-label="Narrion"
-    @mouseenter="paused = true" @mouseleave="paused = false"
-  >
-    <div class="slides" aria-hidden="true">
-      <div
-        v-for="(slide, i) in bannerSlides" :key="slide.image"
-        class="slide" :class="{ active: i === current, still: reducedMotion }"
-        :style="{ backgroundImage: `url(${slide.image})` }"
-      />
-    </div>
-    <div class="shade" />
-
-    <div class="inner">
-      <div class="copy">
-        <h1 class="title">Your campaign, remembered.</h1>
-        <p class="sub">
-          Build your world, run your sessions and let an AI that already knows every NPC, place and plot thread help you prepare.
-        </p>
-
-        <div class="actions">
-          <!-- Visitors get one clear action; members get the three ways in. -->
-          <button v-if="!state.user" class="btn btn-accent btn-lg" @click="openAccountForm('register')">
-            <Sparkles :size="18" /> Register now — it's free
-          </button>
-          <template v-else>
-            <RouterLink to="/generators/campaign" class="btn btn-accent btn-lg">
-              <Castle :size="18" /> Create a campaign
-              <Lock v-if="isFree" :size="14" />
-            </RouterLink>
-            <RouterLink to="/generators/one-shot" class="btn btn-glass btn-lg">
-              <ScrollText :size="18" /> Create a one-shot
-            </RouterLink>
-            <RouterLink v-if="continueLink" :to="continueLink" class="btn btn-glass btn-lg">
-              <PlayCircle :size="18" /> <span class="truncate">Continue {{ lastCampaign.name }}</span> <ArrowRight :size="16" />
-            </RouterLink>
-          </template>
-        </div>
-      </div>
-    </div>
-
-    <div class="indicator">
-      <span class="label">{{ bannerSlides[current].label }}</span>
-      <div class="dots" role="tablist" aria-label="Choose a slide">
-        <button
-          v-for="(slide, i) in bannerSlides" :key="slide.label"
-          role="tab" :aria-selected="i === current" :aria-label="slide.label"
-          :class="{ on: i === current }" @click="show(i); start()"
+  <div class="banner-wrap">
+    <section
+      class="banner"
+      aria-roledescription="carousel" aria-label="Narrion"
+      @mouseenter="paused = true" @mouseleave="paused = false"
+    >
+      <div class="slides" aria-hidden="true">
+        <div
+          v-for="(slide, i) in bannerSlides" :key="slide.image"
+          class="slide" :class="{ active: i === current, still: reducedMotion }"
+          :style="{ backgroundImage: `url(${slide.image})` }"
         />
       </div>
-    </div>
-  </section>
+      <div class="shade" />
+
+      <div class="inner">
+        <div class="copy">
+          <p class="eyebrow">Campaign prep for Dungeon Masters</p>
+          <h1 class="title">Your campaign, remembered.</h1>
+          <p class="sub">
+            Build your world, run your sessions and let an AI that already knows every NPC, place and plot thread help you prepare.
+          </p>
+
+          <div class="actions">
+            <!-- Visitors get one clear action; members get one primary, one secondary and a text link. -->
+            <button v-if="!state.user" class="btn btn-primary" @click="openAccountForm('register')">
+              <Sparkles :size="18" /> Register now — it's free
+            </button>
+            <template v-else>
+              <RouterLink to="/generators/campaign" class="btn btn-primary">
+                <Castle :size="18" /> Create a campaign
+                <Lock v-if="isFree" :size="16" />
+              </RouterLink>
+              <RouterLink to="/generators/one-shot" class="btn btn-on-image">
+                <ScrollText :size="18" /> Create a one-shot
+              </RouterLink>
+              <RouterLink v-if="continueLink" :to="continueLink" class="continue">
+                <PlayCircle :size="16" /> <span class="truncate">Continue {{ lastCampaign.name }}</span> <ArrowRight :size="16" />
+              </RouterLink>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <div class="indicator">
+        <span class="label">{{ bannerSlides[current].label }}</span>
+        <div class="dots" role="tablist" aria-label="Choose a slide">
+          <button
+            v-for="(slide, i) in bannerSlides" :key="slide.label"
+            role="tab" :aria-selected="i === current" :aria-label="slide.label"
+            :class="{ on: i === current }" @click="show(i); start()"
+          />
+        </div>
+      </div>
+    </section>
+  </div>
 </template>
 
 <style scoped>
-/* Always in brand colours, whichever theme is active. */
+/* A bordered panel inside the page gutter, instead of an edge-to-edge photo with glows. */
+.banner-wrap { padding: 16px 16px 0; }
 .banner {
-  position: relative; overflow: hidden; color: #ffffff; background: #0b1630;
-  height: 70vh; min-height: 460px; max-height: 860px;
+  position: relative; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  background: var(--bg); color: var(--on-image);
 }
 
 .slides, .slide, .shade { position: absolute; inset: 0; }
@@ -128,47 +134,60 @@ const continueLink = computed(() => {
 .slide.still.active { animation: none; }
 @keyframes drift { from { transform: scale(1.02); } to { transform: scale(1.1); } }
 
-/* Darkens the left for readable text, and the bottom edge towards the page. */
-.shade {
-  background:
-    linear-gradient(90deg, rgba(8, 15, 34, 0.92) 0%, rgba(8, 15, 34, 0.7) 38%, rgba(8, 15, 34, 0.15) 75%),
-    linear-gradient(0deg, rgba(8, 15, 34, 0.75) 0%, rgba(8, 15, 34, 0) 35%);
-}
+/* One flat scrim — no gradients — keeps the text readable on every photo. */
+.shade { background: var(--scrim); }
 
 /* Same column as the page content, so the text lines up with it. */
 .inner {
-  position: relative; height: 100%;
-  max-width: 1180px; margin: 0 auto; padding: 0 24px;
-  display: flex; align-items: center;
+  position: relative;
+  max-width: 1180px; margin: 0 auto; padding: 112px 24px 88px;
 }
-.copy { max-width: 620px; }
-.title { color: #ffffff; font-size: clamp(36px, 5vw, 60px); font-weight: 750; letter-spacing: -0.02em; line-height: 1.1; }
-.sub { font-size: 18px; color: rgba(255, 255, 255, 0.78); margin-top: 16px; max-width: 540px; }
+.copy { max-width: 900px; }
+.eyebrow { color: var(--on-image-accent); }
+.title {
+  margin-top: 20px; color: var(--on-image);
+  font-weight: 600;
+  font-size: clamp(40px, 5.6vw, 72px); line-height: 1.05; letter-spacing: -0.03em;
+}
+.sub { margin-top: 24px; max-width: 560px; font-size: 19px; line-height: 1.55; color: var(--on-image-muted); }
 
-.actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
-.btn-lg { height: 46px; padding: 0 20px; font-size: 15px; border-radius: var(--radius); }
-.btn-glass {
-  background: rgba(255, 255, 255, 0.12); color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.28); backdrop-filter: blur(6px);
+.actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 40px; }
+/* Secondary button on the photo: outlined, light text in both themes. */
+.btn-on-image { background: transparent; color: var(--on-image); border-color: var(--on-image-border); font-weight: 500; }
+.btn-on-image:hover { color: var(--on-image); border-color: var(--on-image); }
+.continue {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-left: 12px;
+  font-size: 15px; font-weight: 500; color: var(--on-image-accent);
 }
-.truncate { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
-.btn-glass:hover { background: rgba(255, 255, 255, 0.2); color: #ffffff; }
+.continue:hover { color: var(--on-image); }
+.truncate { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .indicator {
-  position: absolute; right: 24px; bottom: 18px;
-  display: flex; align-items: center; gap: 12px;
+  position: absolute; right: 16px; bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
 }
-.label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: rgba(255, 255, 255, 0.8); }
-.dots { display: flex; gap: 6px; }
+.label {
+  font-size: 12px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--on-image-muted);
+}
+.dots { display: flex; }
+/* 44px tall hit area; the visible dot is drawn inside it. */
 .dots button {
-  width: 8px; height: 8px; padding: 0; border-radius: 999px; border: none; cursor: pointer;
-  background: rgba(255, 255, 255, 0.4); transition: width 0.3s, background 0.3s;
+  width: 22px; height: 44px; padding: 0; border: none; background: none; cursor: pointer;
+  display: grid; place-items: center;
 }
-.dots button.on { width: 24px; background: #ffffff; }
+.dots button::before {
+  content: ''; width: 8px; height: 8px; border-radius: 999px;
+  background: var(--on-image-border); transition: background 0.3s;
+}
+.dots button.on::before { background: var(--on-image-accent); }
 
 @media (max-width: 640px) {
-  .banner { min-height: 420px; }
-  .sub { font-size: 15px; }
+  .banner-wrap { padding: 12px 12px 0; }
+  .inner { padding: 64px 20px 72px; }
+  .sub { font-size: 17px; }
+  .actions { margin-top: 32px; }
+  .continue { margin-left: 0; }
   .label { display: none; }
 }
 </style>

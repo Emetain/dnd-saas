@@ -1,11 +1,14 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Bookmark, Check, Dices, Lock, MessageSquare, Sparkles, X } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft, ArrowRight, Bookmark, Dices, RotateCcw, Lock, MessageSquare, Sparkles, X } from 'lucide-vue-next'
 import { campaignGeneratorApi } from '../../services/api'
 import { useSession } from '../../stores/session'
-import JsonView from '../../components/JsonView.vue'
 import GenerationError from '../../components/GenerationError.vue'
+import ResultCard from '../../components/ResultCard.vue'
+import ResultFields from '../../components/ResultFields.vue'
+import { exampleToText, toPlainText } from '../../utils/text'
+import { findExample } from '../../data/examples'
 import { gameSystems, limits, randomIdea, range } from '../../data/campaignOptions'
 
 /**
@@ -15,6 +18,7 @@ import { gameSystems, limits, randomIdea, range } from '../../data/campaignOptio
  */
 const props = defineProps({ generator: { type: Object, required: true } })
 const { isFree, refreshBalance } = useSession()
+const route = useRoute()
 const router = useRouter()
 
 const oneShot = computed(() => props.generator.slug === 'one-shot')
@@ -44,6 +48,17 @@ const form = reactive({
   npcCount: 6,
   questCount: 4,
 })
+
+/**
+ * Opened with "Use this example" (?example=<id>): its idea and settings are filled in
+ * and the example is shown as the result until the first real generation.
+ */
+const found = findExample(route.query.example)
+const example = found?.type.generator === props.generator.slug ? found.example : null
+if (example) {
+  for (const [key, value] of Object.entries(example.prefill)) if (key in form) form[key] = value
+}
+const exampleText = example ? exampleToText(example) : ''
 
 const generatingIdea = ref(false)
 /** Every idea this user generated before (campaign and one-shot) — they cost tokens, so they are kept. */
@@ -144,6 +159,7 @@ async function generate() {
         .map((q) => ({ questionId: q.id, question: q.question, answer: answers[q.id] })),
     }
     result.value = oneShot.value ? await campaignGeneratorApi.oneShot(body) : await campaignGeneratorApi.generate(body)
+    rolls.value += 1
     step.value = 'result'
   } catch (e) {
     error.value = e
@@ -152,6 +168,21 @@ async function generate() {
     refreshBalance()
   }
 }
+
+/** How many results this screen has generated — the "Roll #n" in the result card. */
+const rolls = ref(0)
+const kindLabel = computed(() => (oneShot.value ? 'One-shot' : 'Campaign'))
+const resultLabel = computed(() => `${kindLabel.value} · ${form.playerCount} players · Level ${form.startingLevel}`)
+const resultOptions = computed(() => {
+  const unit = oneShot.value ? (form.length === 1 ? 'hour' : 'hours') : (form.length === 1 ? 'session' : 'sessions')
+  return [form.system, form.tone, `${form.length} ${unit}`].filter(Boolean).join(' · ')
+})
+const planLabel = computed(() => (oneShot.value ? 'Adventure plan' : 'Session 1 plan'))
+const copyText = computed(() => {
+  const r = result.value
+  if (!r) return ''
+  return [r.campaign.name, r.campaign.description, `${planLabel.value}:`, toPlainText(r.firstSessionPlan)].filter(Boolean).join('\n\n')
+})
 
 const createdSummary = computed(() => {
   const c = result.value?.created
@@ -194,7 +225,7 @@ const createdSummary = computed(() => {
             <button type="button" class="btn btn-ghost btn-sm" :disabled="!savedIdeas.length" @click="showSaved = !showSaved">
               <Bookmark :size="14" /> Saved ideas ({{ savedIdeas.length }})
             </button>
-            <button type="button" class="btn btn-ai btn-sm" :disabled="generatingIdea" @click="generateIdea">
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="generatingIdea" @click="generateIdea">
               <span v-if="generatingIdea" class="spinner" /><Sparkles v-else :size="14" />
               {{ generatingIdea ? 'Thinking…' : `Generate idea · ${IDEA_COST} tokens` }}
             </button>
@@ -299,27 +330,38 @@ const createdSummary = computed(() => {
     </div>
 
     <!-- Step 3: the result -->
-    <div v-else-if="step === 'result' && result" class="stack">
-      <div class="card created">
-        <div class="row">
-          <span class="check-icon"><Check :size="18" /></span>
-          <div>
-            <h2>{{ result.campaign.name }}</h2>
-            <p class="muted">{{ result.campaign.description }}</p>
-          </div>
-        </div>
-        <div class="row counts">
-          <span v-for="[label, n] in createdSummary" :key="label" class="badge badge-blue">{{ n }} {{ label }}</span>
-        </div>
-        <RouterLink :to="`/campaigns/${result.campaign.id}`" class="btn btn-primary">
+    <ResultCard
+      v-else-if="step === 'result' && result"
+      :label="resultLabel" :title="result.campaign.name" :options="resultOptions" :roll="rolls" :copy-text="copyText"
+    >
+      <template #actions>
+        <RouterLink :to="`/campaigns/${result.campaign.id}`" class="btn btn-primary btn-sm">
           Open {{ oneShot ? 'one-shot' : 'campaign' }} <ArrowRight :size="16" />
         </RouterLink>
+      </template>
+
+      <div class="result-body">
+        <p v-if="result.campaign.description" class="premise">{{ result.campaign.description }}</p>
+        <div v-if="createdSummary.length" class="counts">
+          <span v-for="[label, n] in createdSummary" :key="label" class="badge">{{ n }} {{ label }}</span>
+        </div>
+        <section class="plan">
+          <h3 class="mono-label plan-label">{{ planLabel }}</h3>
+          <ResultFields :value="result.firstSessionPlan" />
+        </section>
       </div>
-      <div class="card">
-        <h2>{{ oneShot ? 'Adventure plan' : 'Session 1 plan' }}</h2>
-        <JsonView :value="result.firstSessionPlan" />
-      </div>
-    </div>
+    </ResultCard>
+
+    <ResultCard
+      v-if="example && step !== 'result' && !rolls"
+      :label="example.label" :title="example.name" :options="example.settings" :copy-text="exampleText"
+    >
+      <template #actions>
+        <button class="btn btn-secondary btn-sm" :disabled="busy" @click="generate"><RotateCcw :size="16" /> Reroll</button>
+      </template>
+      <ResultFields :fields="example.fields" />
+      <template #footer-end><span>Example result</span></template>
+    </ResultCard>
 
     <GenerationError v-if="error" :error="error" />
   </div>
@@ -341,11 +383,6 @@ const createdSummary = computed(() => {
 }
 .saved-use:hover { background: var(--surface); border-color: var(--border); }
 .saved-use.active { background: var(--primary-soft); border-color: var(--primary-border); color: var(--primary-text); }
-.btn-ai {
-  background: linear-gradient(135deg, var(--primary), var(--accent));
-  color: var(--on-color);
-}
-.btn-ai:hover:not(:disabled) { filter: brightness(1.08); color: var(--on-color); }
 .steps { display: flex; gap: 8px; list-style: none; padding: 0; margin: 0; flex-wrap: wrap; }
 .steps li { font-size: 13px; font-weight: 560; color: var(--text-muted); padding: 6px 12px; border-radius: 999px; background: var(--surface-muted); }
 .steps li.active { background: var(--strong-bg); color: var(--on-color); }
@@ -353,7 +390,10 @@ const createdSummary = computed(() => {
 .steps li.done { background: var(--primary-soft-strong); color: var(--primary-text); }
 .sizes summary { cursor: pointer; font-weight: 560; color: var(--text-secondary); margin-bottom: 12px; }
 .actions { flex-wrap: wrap; }
-.free { font-size: 11px; background: rgba(255, 255, 255, 0.2); padding: 1px 6px; border-radius: 999px; }
+.free {
+  display: inline-flex; align-items: center; min-height: 20px; padding: 0 7px; border-radius: 999px;
+  font-size: 12px; background: color-mix(in srgb, currentColor 14%, transparent);
+}
 .understanding { border-left: 3px solid var(--primary); }
 .understanding p { margin-top: 6px; }
 .question h3 { margin: 0 0 2px; }
@@ -364,11 +404,9 @@ const createdSummary = computed(() => {
 }
 .chip:hover { border-color: var(--primary-border); color: var(--primary-text); }
 .chip.active { background: var(--primary); border-color: var(--primary); color: var(--on-color); }
-.created { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; border-top: 3px solid var(--primary); }
-.created h2 { margin: 0; }
-.counts { flex-wrap: wrap; }
-.check-icon {
-  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
-  background: var(--success-soft); color: var(--success-text);
-}
+.result-body { display: flex; flex-direction: column; gap: 24px; }
+.premise { font-size: 17px; line-height: 1.6; color: var(--text-body); max-width: 68ch; }
+.counts { display: flex; flex-wrap: wrap; gap: 8px; }
+.plan { border-top: 1px solid var(--divider); padding-top: 24px; }
+.plan-label { margin-bottom: 20px; }
 </style>

@@ -134,7 +134,7 @@ onMounted(load)
       <div v-if="currentGenerators.length" class="tab-actions">
         <button
           v-for="gen in currentGenerators" :key="gen.slug"
-          class="btn btn-sm" :class="gen === currentGenerators[0] ? 'btn-ai' : 'btn-secondary'"
+          class="btn btn-sm" :class="gen === currentGenerators[0] ? 'btn-primary' : 'btn-secondary'"
           @click="generating = gen.slug"
         >
           <Sparkles :size="14" /> Generate {{ gen.label }}
@@ -246,7 +246,9 @@ onMounted(load)
 .gen-item .cost { margin-left: auto; }
 
 .tab-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin: -6px 0 16px; }
-.btn-ai { background: linear-gradient(135deg, var(--primary), var(--accent)); color: var(--on-color); }
-.btn-ai:hover:not(:disabled) { filter: brightness(1.08); color: var(--on-color); }
-.cost-chip { font-size: 11px; padding: 1px 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.12); }
+/* Tinted with the button's own text colour, so it works on gold and outlined buttons in both themes. */
+.cost-chip {
+  display: inline-flex; align-items: center; min-height: 20px; padding: 0 7px; border-radius: 999px;
+  font-size: 12px; background: color-mix(in srgb, currentColor 14%, transparent);
+}
 </style>

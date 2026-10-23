@@ -24,7 +24,7 @@ const generator = computed(() => findGenerator(props.slug))
           <p>{{ generator.description }}</p>
         </div>
       </div>
-      <span class="badge badge-navy">{{ generator.cost }} tokens</span>
+      <span class="badge">{{ generator.cost }} tokens</span>
     </div>
 
     <UpgradePrompt v-if="isFree && !generator.free" :feature="generator.label" />
@@ -36,7 +36,7 @@ const generator = computed(() => findGenerator(props.slug))
 <style scoped>
 .head { align-items: flex-start; gap: 14px; }
 .icon {
-  width: 42px; height: 42px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center;
-  background: var(--strong-bg); color: var(--on-color);
+  width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--radius-btn); display: grid; place-items: center;
+  background: var(--surface); border: 1px solid var(--border); color: var(--accent-text);
 }
 </style>
