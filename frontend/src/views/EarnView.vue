@@ -205,7 +205,7 @@ onMounted(load)
 .streak { display: flex; gap: 32px; }
 .code-row { display: flex; gap: 8px; align-items: center; }
 .code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; font-weight: 600;
+  font-size: 15px; font-weight: 600; letter-spacing: 0.04em;
   background: var(--primary-soft); color: var(--primary-text); padding: 6px 12px; border-radius: var(--radius-sm);
 }
 .apply { width: 100%; }

@@ -270,7 +270,7 @@ onMounted(async () => {
 .tokens { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--primary-text); }
 .plan ul { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 6px; flex: 1; align-content: start; }
 .plan li { display: flex; gap: 8px; font-size: 13px; color: var(--text-secondary); }
-.plan li svg { color: var(--success-text); flex-shrink: 0; margin-top: 3px; }
+.plan li svg { color: var(--success-text); flex-shrink: 0; margin-top: calc((1lh - 14px) / 2); }
 .pack { text-align: center; display: flex; flex-direction: column; gap: 4px; align-items: center; }
 .pack { position: relative; }
 .pack-badge { position: absolute; top: 12px; right: 12px; }

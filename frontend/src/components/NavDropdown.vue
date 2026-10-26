@@ -55,12 +55,12 @@ onBeforeUnmount(() => { open.value = false })
 .dropdown { position: relative; }
 .trigger {
   display: inline-flex; align-items: center; gap: 4px;
-  height: 36px; padding: 0 12px; border: none; border-radius: var(--radius-sm);
-  background: transparent; color: rgba(255, 255, 255, 0.78);
-  font: inherit; font-weight: 560; cursor: pointer;
+  min-height: 44px; padding: 0 12px; border: none; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-muted);
+  font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
 }
-.trigger:hover, .trigger.open { background: rgba(255, 255, 255, 0.08); color: var(--on-color); }
-.trigger.active { color: var(--on-color); }
+.trigger:hover, .trigger.open { background: var(--raised); color: var(--text); }
+.trigger.active { color: var(--text); }
 .chevron { opacity: 0.7; transition: transform 0.15s; }
 .trigger.open .chevron { transform: rotate(180deg); }
 
@@ -68,7 +68,7 @@ onBeforeUnmount(() => { open.value = false })
   position: absolute; top: calc(100% + 8px);
   min-width: 240px; padding: 8px;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  border-radius: var(--radius); box-shadow: var(--float-shadow);
   z-index: 50;
 }
 .panel.align-left { left: 0; }
